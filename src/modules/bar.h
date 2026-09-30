@@ -43,7 +43,6 @@ class Bar {
 
     void set_hints(const OutputGeometry &output);
     void paint_background(const Rect &rect);
-    void paint_border();
     void paint_panel();
     void draw_all();
     void draw_clock();
@@ -54,7 +53,6 @@ class Bar {
     void click(const xcb_button_press_event_t &event);
     void hover(std::optional<int> x);
     Rect clock_rect() const;
-    double centered_y(int text_height) const;
 
     XConnection &x_;
     IpcServer &ipc_;

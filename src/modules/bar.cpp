@@ -172,19 +172,16 @@ void Bar::paint_background(const Rect &rect) {
     cairo_set_operator(cr_, CAIRO_OPERATOR_OVER);
 }
 
-void Bar::paint_border() {
+void Bar::paint_panel() {
     constexpr double inset = bar_config::border_width / 2.0;
+    set_source(cr_, bar_config::background);
+    rounded_rect(cr_, panel_.x, panel_.y, panel_.width, panel_.height, bar_config::corner_radius);
+    cairo_fill(cr_);
     set_source(cr_, bar_config::border);
     cairo_set_line_width(cr_, bar_config::border_width);
     rounded_rect(cr_, panel_.x + inset, panel_.y + inset, panel_.width - 2 * inset,
                  panel_.height - 2 * inset, bar_config::corner_radius - inset);
     cairo_stroke(cr_);
-}
-
-void Bar::paint_panel() {
-    set_source(cr_, bar_config::background);
-    rounded_rect(cr_, panel_.x, panel_.y, panel_.width, panel_.height, bar_config::corner_radius);
-    cairo_fill(cr_);
 }
 
 void Bar::draw_all() {
@@ -194,19 +191,21 @@ void Bar::draw_all() {
     cairo_paint(cr_);
     cairo_set_operator(cr_, CAIRO_OPERATOR_OVER);
     paint_panel();
-    paint_border();
-    clock_rect_ = clock_rect();
-    draw_clock();
 
+    // Left region grows rightward from the left edge.
     set_source(cr_, bar_config::foreground);
-    int left = panel_.x + bar_config::padding_x;
-    logout_rect_ = {left, panel_.y, logout_->width(), panel_.height};
+    logout_rect_ = {panel_.x + bar_config::padding_x, panel_.y, logout_->width(), panel_.height};
     logout_->draw(cr_, logout_rect_.x, panel_.y, panel_.height);
     const WorkspaceStatus &workspaces = workspaces_->status();
     workspace_rect_ = {logout_rect_.x + logout_rect_.width + bar_config::group_gap, panel_.y,
                        workspace_row_width(workspaces), panel_.height};
     draw_workspace_row(cr_, workspaces, workspace_rect_.x, panel_.y, panel_.height);
 
+    // Center region grows outward from the panel center.
+    clock_rect_ = clock_rect();
+    draw_clock();
+
+    // Right region grows leftward from the right edge.
     set_source(cr_, bar_config::foreground);
     int status_width = status_->width();
     status_rect_ = {panel_.x + panel_.width - bar_config::padding_x - status_width, panel_.y,
@@ -217,7 +216,7 @@ void Bar::draw_all() {
 
 void Bar::draw_clock() {
     set_source(cr_, bar_config::foreground);
-    clock_->draw(cr_, clock_rect_.x, centered_y(clock_->height()));
+    clock_->draw(cr_, panel_.x + panel_.width / 2.0, panel_.y + panel_.height / 2.0);
 }
 
 void Bar::redraw_clock() {
@@ -290,10 +289,6 @@ void Bar::present(const Rect &rect) {
 Bar::Rect Bar::clock_rect() const {
     int width = clock_->width();
     return {panel_.x + (panel_.width - width) / 2, panel_.y, width, panel_.height};
-}
-
-double Bar::centered_y(int text_height) const {
-    return panel_.y + (panel_.height - text_height) / 2.0;
 }
 
 } // namespace astralia

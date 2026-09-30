@@ -15,8 +15,7 @@ class ClockWidget {
 
     bool refresh();
     int width() const { return text_.width(); }
-    int height() const { return text_.height(); }
-    void draw(cairo_t *cr, double x, double y) const { text_.draw(cr, x, y); }
+    void draw(cairo_t *cr, double cx, double cy) const { text_.draw_ink_centered(cr, cx, cy); }
 
   private:
     Text text_;
