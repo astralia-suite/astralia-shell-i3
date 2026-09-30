@@ -5,11 +5,13 @@
 
 namespace astralia {
 
-SystemBus::SystemBus(EventLoop &loop) : loop_(loop) {
+SystemBus::SystemBus(EventLoop &loop, BusKind kind) : loop_(loop) {
     try {
-        conn_ = sdbus::createSystemBusConnection();
+        conn_ = kind == BusKind::session ? sdbus::createSessionBusConnection()
+                                         : sdbus::createSystemBusConnection();
     } catch (const sdbus::Error &error) {
-        log::error("cannot connect to the system bus: {}", error.what());
+        log::error("cannot connect to the {} bus: {}",
+                   kind == BusKind::session ? "session" : "system", error.what());
         return;
     }
     sdbus::IConnection::PollData data = conn_->getEventLoopPollData();

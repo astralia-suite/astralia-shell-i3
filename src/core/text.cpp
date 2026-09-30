@@ -22,6 +22,11 @@ bool Text::set(std::string_view text) {
     return true;
 }
 
+void Text::wrap(int width) {
+    pango_layout_set_width(layout_.get(), width * PANGO_SCALE);
+    pango_layout_set_wrap(layout_.get(), PANGO_WRAP_WORD_CHAR);
+}
+
 int Text::width() const {
     int width = 0;
     pango_layout_get_pixel_size(layout_.get(), &width, nullptr);

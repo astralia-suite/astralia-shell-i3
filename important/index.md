@@ -35,7 +35,7 @@
 
 ## `src/`
 
-- `main.cpp`: Parses the mode; runs the IPC client, or locks, daemonizes, creates X, loop, IPC server, wallpaper, bar, launcher, logout and polkit.
+- `main.cpp`: Parses the mode; runs the IPC client, or locks, daemonizes, creates X, loop, IPC server, wallpaper, bar, launcher, logout, polkit and notifications.
 
 ## `src/core/`
 
@@ -47,15 +47,15 @@
 - `unique_fd.h`: Move-only RAII file descriptor.
 - `log.{h,cpp}`: `log::info` and `log::error` formatted messages to stderr.
 - `x_connection.{h,cpp}`: RAII xcb connection (syncs before disconnect, cairo MIT-SHM disabled) with screen, root and ARGB visuals, EWMH, atoms, RandR outputs.
-- `event_loop.{h,cpp}`: `poll()` loop over X, `signalfd`, a `CLOCK_BOOTTIME` `timerfd`, extra fds and prepare/dispatch poll sources; window and event-type handlers, timers, `stop()`.
-- `text.{h,cpp}`: Cached `PangoLayout` with a fixed font; set text, measure pixel size, draw (vertically or ink centered) on cairo.
+- `event_loop.{h,cpp}`: `poll()` loop over X, `signalfd`, a `CLOCK_BOOTTIME` `timerfd`, extra fds and prepare/dispatch poll sources; window and event-type handlers, timers with `reschedule()`, `stop()`.
+- `text.{h,cpp}`: Cached `PangoLayout` with a fixed font; set text, optional word wrap, measure pixel size, draw (vertically or ink centered) on cairo.
 - `keyboard.{h,cpp}`: xkbcommon-x11 keymap; translates key presses, with modifiers from the event, to text, backspace, arrows, enter, escape.
 - `spawn.{h,cpp}`: `spawn_detached()`: double-forked `sh -c` with an empty signal mask and default `SIGPIPE`.
 - `palette.h`: `Color`, `constexpr` `color("#hex")` parser, shared `palette::` colors and `metrics::` radii/borders.
 - `icons.h`: `icon::` Tabler glyph codepoints as UTF-8 strings.
 - `app_fonts.{h,cpp}`: Idempotent `register_app_fonts()` adds the icon, text and Yuji Mai fonts to fontconfig from the install or source dir.
 - `image_decode.{h,cpp}`: `SurfacePtr` and `decode_image()`: `stb_image` rasters or `resvg` SVGs into premultiplied cairo surfaces, optionally fit to a size.
-- `dbus.{h,cpp}`: `SystemBus` sdbus-c++ connection driven by `EventLoop` fds, `add_match()`, `proxy()`, and `dbus_property<T>()` via proxy or path.
+- `dbus.{h,cpp}`: `SystemBus` sdbus-c++ system or session (`BusKind`) connection driven by `EventLoop` fds, `add_match()`, `proxy()`, and `dbus_property<T>()` via proxy or path.
 
 ## `src/config/`
 
@@ -63,6 +63,7 @@
 - `logout_config.h`: Logout button ring geometry, Yuji Mai glyph font, colors, logo file and the 8-entry glyph/command action table.
 - `launcher_config.h`: Launcher geometry, fonts, colors, launch commands, search limits, and result, submenu and visit plain types.
 - `polkit_config.h`: Polkit card geometry, line heights, fonts, colors, prompt texts and echo glyph file.
+- `notification_config.h`: Notification stack margins, spacing, 480 px stack cap, 400 px card geometry, wrap width, app/title/body fonts, colors and the fixed 1.5 s `hang_time`.
 - `wallpaper_config.h`: Wallpaper config file path under the config dir, `*` wildcard output key, fallback color.
 
 ## `src/modules/`
@@ -70,6 +71,7 @@
 - `bar.{h,cpp}`: Top dock with inset pill-shaped panel, EWMH hints and strut; owns services; logout and workspaces left, clock center, status right; logout click dispatches `logout` IPC; periodic `malloc_trim`.
 - `launcher.{h,cpp}`: `launcher` / `launcher global` IPC toggle; override-redirect overlay on the pointer's output; takes input focus, closes on focus loss; `malloc_trim` on close.
 - `logout.{h,cpp}`: `logout` IPC toggle; override-redirect overlay on the pointer's output with 8 glyph buttons around the logo; keys, hover, click run actions.
+- `notification.{h,cpp}`: Owns `NotificationService`; unfocusable override-redirect card stack at the pointer output's bottom right; click dismisses.
 - `polkit.{h,cpp}`: Owns `PolkitService`; override-redirect card on the pointer's output while a request is pending; masked password, `Enter` submits, `Escape` cancels.
 - `wallpaper.{h,cpp}`: Per-output root pixmap from `wallpaper.conf` via `_XROOTPMAP_ID`, cleared on exit; repaints on RandR or `inotify` changes, then `malloc_trim`.
 
@@ -96,6 +98,10 @@
 
 - `layout.{h,cpp}`: `Point`, ring `logout_button_center()` and square hit-test `logout_button_at()`.
 
+## `src/modules/notification/`
+
+- `layout.{h,cpp}`: `notification_card_height()` from measured text, `notification_fit_count()` under the stack cap, stack height, bottom-right `notification_stack_origin()` and click hit-test `notification_at()`.
+
 ## `src/modules/polkit/`
 
 - `layout.{h,cpp}`: `utf8_length()`, `polkit_card_height()` and `polkit_visible_dots()` for the card.
@@ -111,8 +117,9 @@
 - `bluetooth_service.{h,cpp}`: BlueZ `GetManagedObjects` on a held root proxy: adapter present, powered, first connected device alias; refreshes on `org.bluez` signals.
 - `network_service.{h,cpp}`: NetworkManager type, captive portal, Wi-Fi strength and SSID via a held manager proxy; refreshes on `PropertiesChanged`.
 - `polkit_service.{h,cpp}`: Polkit authentication agent on the session; drives the default `GMainContext` via an `EventLoop` poll source; request, response and info state.
+- `notification_service.{h,cpp}`: `org.freedesktop.Notifications` server on the session bus; FIFO list expiring each entry after `hang_time`.
 - `battery_service.{h,cpp}`: UPower `DisplayDevice` presence, percent, charging and full state via a held proxy; refreshes on its signals.
 
 ## `test/`
 
-- `main.cpp`: Plain check runner for `astralia-shell-test`; covers clock timing, CLI, runtime paths, help, `color()`, status icons, workspace row, wallpaper cover and config, launcher search, parsing, URLs, ranking, submenus, logout and polkit layout.
+- `main.cpp`: Plain check runner for `astralia-shell-test`; covers clock timing, CLI, runtime paths, help, `color()`, status icons, workspace row, wallpaper cover and config, launcher search, parsing, URLs, ranking, submenus, logout, polkit and notification layout.

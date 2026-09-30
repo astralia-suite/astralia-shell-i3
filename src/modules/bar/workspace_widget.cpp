@@ -48,8 +48,9 @@ std::optional<uint32_t> workspace_at(const WorkspaceStatus &status, int offset) 
 void draw_workspace_row(cairo_t *cr, const WorkspaceStatus &status, double x, int top, int height) {
     double y = top + (height - bar_config::pill_height) / 2.0;
     for (uint32_t i = 0; i < status.count; ++i) {
-        const Color &color =
-            i == status.current ? bar_config::pill_active : bar_config::pill_inactive;
+        const Color &color = i == status.current           ? bar_config::pill_active
+                             : (status.occupied >> i) & 1u ? bar_config::pill_occupied
+                                                           : bar_config::pill_inactive;
         cairo_set_source_rgba(cr, color.r, color.g, color.b, color.a);
         int width = pill_width(status, i);
         fill_pill(cr, x, y, width, bar_config::pill_height);

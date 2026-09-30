@@ -30,7 +30,8 @@ class EventLoop {
 
     void on_window(xcb_window_t window, EventHandler handler);
     void on_event(uint8_t type, EventHandler handler);
-    void add_timer(NextFire next_fire, TimerCallback callback);
+    int add_timer(NextFire next_fire, TimerCallback callback);
+    void reschedule(int timer);
     void on_fd(int fd, FdHandler handler);
     void remove_fd(int fd);
     int add_poll_source(PollPrepare prepare, PollDispatch dispatch);

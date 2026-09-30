@@ -15,6 +15,7 @@
 #include "modules/bar.h"
 #include "modules/launcher.h"
 #include "modules/logout.h"
+#include "modules/notification.h"
 #include "modules/polkit.h"
 #include "modules/wallpaper.h"
 
@@ -53,5 +54,6 @@ int main(int argc, char **argv) {
     astralia::Launcher launcher(*x, *loop, **ipc);
     astralia::Logout logout(*x, *loop, **ipc);
     astralia::Polkit polkit(*x, *loop);
+    astralia::Notifications notifications(*x, *loop);
     return loop->run();
 }

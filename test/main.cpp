@@ -27,6 +27,7 @@
 #include "modules/launcher/submenu.h"
 #include "modules/launcher/visit_store.h"
 #include "modules/logout/layout.h"
+#include "modules/notification/layout.h"
 #include "modules/polkit/layout.h"
 #include "modules/wallpaper/config_file.h"
 #include "modules/wallpaper/image.h"
@@ -320,6 +321,29 @@ void check_polkit_layout() {
     check(astralia::polkit_visible_dots(3, -1.0) == 0, "no width shows no dots");
 }
 
+void check_notification_layout() {
+    check(astralia::notification_card_height(20.0, 0.0, 0.0) == 60.0, "card height with app name only");
+    check(astralia::notification_card_height(20.0, 24.0, 0.0) == 94.0, "card height with title");
+    check(astralia::notification_card_height(20.0, 24.0, 40.0) == 144.0, "card height with all fields");
+    std::vector<double> tall{100.0, 200.0, 200.0};
+    check(astralia::notification_fit_count(tall) == 2, "oldest card beyond 480 px is dropped");
+    std::vector<double> huge{600.0};
+    check(astralia::notification_fit_count(huge) == 1, "newest card always shows");
+    check(astralia::notification_fit_count({}) == 0, "no cards fit nothing");
+    std::vector<double> heights{50.0, 72.0};
+    check(astralia::notification_stack_height(heights) == 130.0, "stack height adds spacing");
+    check(astralia::notification_stack_height({}) == 0.0, "empty stack has no height");
+    astralia::StackOrigin origin = astralia::notification_stack_origin({0, 0, 1920, 1080}, 130.0);
+    check(origin.x == 1920 - 10 - 400 && origin.y == 1080 - 10 - 130,
+          "stack sits 10 px from the bottom-right corner");
+    astralia::StackOrigin offset = astralia::notification_stack_origin({1920, 0, 1280, 1024}, 50.0);
+    check(offset.x == 1920 + 1280 - 410 && offset.y == 1024 - 60, "stack follows output offset");
+    check(astralia::notification_at(0.0, heights) == 0, "top card hits");
+    check(!astralia::notification_at(54.0, heights), "gap between cards hits nothing");
+    check(astralia::notification_at(58.0, heights) == 1, "second card hits");
+    check(!astralia::notification_at(130.0, heights), "below the stack hits nothing");
+}
+
 } // namespace
 
 int main() {
@@ -341,6 +365,7 @@ int main() {
     check_submenu();
     check_logout_layout();
     check_polkit_layout();
+    check_notification_layout();
     if (failures > 0) {
         std::println(stderr, "{} check(s) failed", failures);
         return EXIT_FAILURE;

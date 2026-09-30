@@ -19,6 +19,7 @@ inline constexpr int label_gap = 6;
 inline constexpr float border_width = metrics::border_thin;
 
 // Workspace pills
+inline constexpr uint32_t workspace_count = 10;
 inline constexpr int pill_height = 10;
 inline constexpr int pill_width = 10;
 inline constexpr int pill_active_width = 26;
@@ -32,7 +33,8 @@ inline constexpr const char *icon_font = "tabler-icons 17";
 inline constexpr Color background = {palette::base.r, palette::base.g, palette::base.b, 0.8f};
 inline constexpr Color border = palette::accent;
 inline constexpr Color foreground = palette::text;
-inline constexpr Color pill_active = palette::accent;
+inline constexpr Color pill_active = palette::accent_alt;
+inline constexpr Color pill_occupied = palette::accent;
 inline constexpr Color pill_inactive = palette::text_alpha20;
 
 // Content

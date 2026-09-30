@@ -10,9 +10,12 @@
 
 namespace astralia {
 
+enum class BusKind { system,
+                     session };
+
 class SystemBus {
   public:
-    explicit SystemBus(EventLoop &loop);
+    explicit SystemBus(EventLoop &loop, BusKind kind = BusKind::system);
     ~SystemBus();
     SystemBus(const SystemBus &) = delete;
     SystemBus &operator=(const SystemBus &) = delete;

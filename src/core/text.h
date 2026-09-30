@@ -13,6 +13,7 @@ class Text {
     explicit Text(const char *font);
 
     bool set(std::string_view text);
+    void wrap(int width);
     int width() const;
     int height() const;
     void draw(cairo_t *cr, double x, double y) const;

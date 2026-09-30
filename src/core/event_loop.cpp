@@ -97,9 +97,16 @@ void EventLoop::on_event(uint8_t type, EventHandler handler) {
     type_handlers_.insert_or_assign(type, std::move(handler));
 }
 
-void EventLoop::add_timer(NextFire next_fire, TimerCallback callback) {
+int EventLoop::add_timer(NextFire next_fire, TimerCallback callback) {
     std::chrono::nanoseconds deadline = boot_now() + next_fire();
     timers_.push_back({std::move(next_fire), std::move(callback), deadline});
+    arm_timer();
+    return static_cast<int>(timers_.size()) - 1;
+}
+
+void EventLoop::reschedule(int timer) {
+    Timer &t = timers_.at(static_cast<std::size_t>(timer));
+    t.deadline = boot_now() + t.next_fire();
     arm_timer();
 }
 
