@@ -46,10 +46,14 @@ StackOrigin notification_stack_origin(const OutputGeometry &output, double stack
             output.y + output.height - cfg::margin_bottom - static_cast<int>(std::ceil(stack_height))};
 }
 
-std::optional<std::size_t> notification_at(double y, std::span<const double> heights) {
+std::optional<std::size_t> notification_close_at(double x, double y, std::span<const double> heights) {
+    constexpr double hit = cfg::card_pad * 2.0 + cfg::close_size;
+    if (x < cfg::card_width - hit || x >= cfg::card_width) {
+        return std::nullopt;
+    }
     double top = 0.0;
     for (std::size_t i = 0; i < heights.size(); ++i) {
-        if (y >= top && y < top + heights[i]) {
+        if (y >= top && y < top + hit) {
             return i;
         }
         top += heights[i] + cfg::spacing;

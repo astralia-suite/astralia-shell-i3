@@ -13,16 +13,50 @@ const std::string nm_service = "org.freedesktop.NetworkManager";
 const std::string nm_path = "/org/freedesktop/NetworkManager";
 constexpr uint32_t connectivity_portal = 2;
 
+std::string wifi_ssid(const NetworkStatus &status) {
+    return status.kind == NetworkKind::wifi ? status.ssid : std::string();
+}
+
 } // namespace
 
-NetworkService::NetworkService(SystemBus &bus, std::function<void()> on_change)
-    : bus_(bus), on_change_(std::move(on_change)), manager_(bus_.proxy(nm_service, nm_path)) {
+std::vector<StatusMessage> network_changes(const NetworkStatus &prev, const NetworkStatus &next) {
+    std::vector<StatusMessage> messages;
+    std::string was = wifi_ssid(prev);
+    std::string now = wifi_ssid(next);
+    if (now != was) {
+        if (!now.empty()) {
+            messages.push_back({"Connected", "Connected to " + now});
+        } else {
+            messages.push_back({"Disconnected", "Disconnected from " + was});
+        }
+    }
+    bool was_ethernet = prev.kind == NetworkKind::ethernet;
+    bool now_ethernet = next.kind == NetworkKind::ethernet;
+    if (now_ethernet && !was_ethernet) {
+        messages.push_back({"Connected", "Connected via Ethernet"});
+    } else if (was_ethernet && !now_ethernet) {
+        messages.push_back({"Disconnected", "Ethernet disconnected"});
+    }
+    if (next.portal && !prev.portal) {
+        messages.push_back({"Captive Portal", now.empty() ? std::string("Sign in required")
+                                                          : "Sign in required for " + now});
+    }
+    return messages;
+}
+
+NetworkService::NetworkService(SystemBus &bus, std::function<void()> on_change, NotifyFn notify)
+    : bus_(bus), on_change_(std::move(on_change)), notify_(std::move(notify)),
+      manager_(bus_.proxy(nm_service, nm_path)) {
     refresh();
     match_ = bus_.add_match("type='signal',sender='org.freedesktop.NetworkManager',"
                             "interface='org.freedesktop.DBus.Properties',"
                             "member='PropertiesChanged'",
                             [this] {
+                                NetworkStatus prev = status_;
                                 if (refresh()) {
+                                    for (const StatusMessage &message : network_changes(prev, status_)) {
+                                        notify_(message);
+                                    }
                                     on_change_();
                                 }
                             });

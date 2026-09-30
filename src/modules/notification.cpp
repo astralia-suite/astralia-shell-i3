@@ -182,7 +182,7 @@ void Notifications::handle(const xcb_generic_event_t &event) {
         break;
     case XCB_BUTTON_PRESS: {
         const auto &press = reinterpret_cast<const xcb_button_press_event_t &>(event);
-        if (auto index = notification_at(press.event_y, heights_)) {
+        if (auto index = notification_close_at(press.event_x, press.event_y, heights_)) {
             service_.dismiss(shown_[*index].id);
         }
         break;
@@ -212,6 +212,16 @@ void Notifications::paint() {
         const Notification &n = shown_[i];
         panel(cr, 0.0, y, cfg::card_width, heights_[i],
               n.critical ? cfg::critical_border : cfg::border);
+        double close_x = cfg::card_width - cfg::card_pad - cfg::close_size;
+        double close_y = y + cfg::card_pad;
+        set_source(cr, cfg::close);
+        cairo_set_line_width(cr, cfg::close_line_width);
+        cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
+        cairo_move_to(cr, close_x, close_y);
+        cairo_line_to(cr, close_x + cfg::close_size, close_y + cfg::close_size);
+        cairo_move_to(cr, close_x + cfg::close_size, close_y);
+        cairo_line_to(cr, close_x, close_y + cfg::close_size);
+        cairo_stroke(cr);
         double line_y = y + cfg::card_pad;
         set_source(cr, cfg::app);
         app_.set(n.app.empty() ? cfg::app_fallback : n.app);

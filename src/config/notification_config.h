@@ -20,6 +20,8 @@ inline constexpr double border_width = metrics::border_thin;
 inline constexpr double content_spacing = 10.0;
 inline constexpr double extra_height = 8.0;
 inline constexpr int wrap_width = 320;
+inline constexpr double close_size = 10.0;
+inline constexpr double close_line_width = 2.0;
 
 // Typography
 inline constexpr const char *app_font = "Comic Shanns Mono Bold 13";
@@ -33,11 +35,12 @@ inline constexpr Color critical_border = palette::critical;
 inline constexpr Color app = palette::accent;
 inline constexpr Color summary = palette::text;
 inline constexpr Color body = palette::text_muted;
+inline constexpr Color close = palette::text_muted;
 
 // Content
 inline constexpr const char *app_fallback = "Notification";
 
 // Timing
-inline constexpr std::chrono::milliseconds hang_time{1500};
+inline constexpr std::chrono::milliseconds hang_time{5000};
 
 } // namespace astralia::notification_config

@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <sdbus-c++/sdbus-c++.h>
+#include <string>
 #include <xcb/xcb.h>
 
 #include "core/event_loop.h"
@@ -18,6 +20,7 @@ class ClockWidget;
 class LogoutWidget;
 class NetworkService;
 class StatusWidget;
+struct StatusMessage;
 class SystemBus;
 class WorkspaceService;
 
@@ -46,6 +49,7 @@ class Bar {
     void draw_clock();
     void redraw_clock();
     void redraw_status();
+    void notify(const std::string &app, const StatusMessage &message);
     void present(const Rect &rect);
     void click(const xcb_button_press_event_t &event);
     void hover(std::optional<int> x);
@@ -64,6 +68,8 @@ class Bar {
     cairo_surface_t *surface_;
     cairo_t *cr_;
     std::unique_ptr<SystemBus> bus_;
+    std::unique_ptr<SystemBus> session_;
+    std::unique_ptr<sdbus::IProxy> notifier_;
     std::unique_ptr<WorkspaceService> workspaces_;
     std::unique_ptr<BluetoothService> bluetooth_;
     std::unique_ptr<NetworkService> network_;

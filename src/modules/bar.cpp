@@ -3,8 +3,10 @@
 #include <cairo-xcb.h>
 #include <chrono>
 #include <malloc.h>
+#include <map>
 #include <numbers>
 #include <string_view>
+#include <vector>
 #include <xcb/xcb_ewmh.h>
 #include <xcb/xcb_icccm.h>
 
@@ -12,6 +14,7 @@
 
 #include "core/app_fonts.h"
 #include "core/dbus.h"
+#include "core/log.h"
 
 #include "modules/bar.h"
 #include "modules/bar/clock_widget.h"
@@ -88,8 +91,14 @@ Bar::Bar(XConnection &x, EventLoop &loop, IpcServer &ipc) : x_(x), ipc_(ipc) {
 
     bus_ = std::make_unique<SystemBus>(loop);
     workspaces_ = std::make_unique<WorkspaceService>(x_, loop, [this] { draw_all(); });
-    bluetooth_ = std::make_unique<BluetoothService>(*bus_, [this] { redraw_status(); });
-    network_ = std::make_unique<NetworkService>(*bus_, [this] { redraw_status(); });
+    session_ = std::make_unique<SystemBus>(loop, BusKind::session);
+    notifier_ = session_->proxy("org.freedesktop.Notifications", "/org/freedesktop/Notifications");
+    bluetooth_ = std::make_unique<BluetoothService>(
+        *bus_, [this] { redraw_status(); },
+        [this](const StatusMessage &message) { notify("Bluetooth", message); });
+    network_ = std::make_unique<NetworkService>(
+        *bus_, [this] { redraw_status(); },
+        [this](const StatusMessage &message) { notify("Network", message); });
     battery_ = std::make_unique<BatteryService>(*bus_, [this] { redraw_status(); });
 
     clock_->refresh();
@@ -229,6 +238,22 @@ void Bar::redraw_clock() {
 void Bar::redraw_status() {
     status_->update(bluetooth_->status(), network_->status(), battery_->status());
     draw_all();
+}
+
+void Bar::notify(const std::string &app, const StatusMessage &message) {
+    if (!notifier_) {
+        return;
+    }
+    try {
+        notifier_->callMethod("Notify")
+            .onInterface("org.freedesktop.Notifications")
+            .withArguments(app, uint32_t{0}, std::string(), message.summary, message.body,
+                           std::vector<std::string>{}, std::map<std::string, sdbus::Variant>{},
+                           int32_t{-1})
+            .dontExpectReply();
+    } catch (const sdbus::Error &error) {
+        log::error("bar: cannot send notification: {}", error.what());
+    }
 }
 
 void Bar::click(const xcb_button_press_event_t &event) {

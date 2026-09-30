@@ -32,6 +32,9 @@
 #include "modules/wallpaper/config_file.h"
 #include "modules/wallpaper/image.h"
 
+#include "service/bluetooth_service.h"
+#include "service/network_service.h"
+
 namespace {
 
 int failures = 0;
@@ -139,6 +142,46 @@ void check_status_icons() {
     check(astralia::battery_icon({true, 100, false, true}) == icon::plugged_in, "full");
     check(astralia::battery_label({true, 57, false, false}) == "57%", "percent label");
     check(astralia::battery_label({true, 100, false, true}) == "Plugged in", "full label");
+}
+
+void check_status_changes() {
+    using astralia::NetworkKind;
+    using astralia::StatusMessage;
+    using Messages = std::vector<StatusMessage>;
+    astralia::NetworkStatus none;
+    astralia::NetworkStatus home{NetworkKind::wifi, 80, "home", false};
+    astralia::NetworkStatus cafe{NetworkKind::wifi, 60, "cafe", false};
+    astralia::NetworkStatus portal{NetworkKind::wifi, 60, "cafe", true};
+    astralia::NetworkStatus wired{NetworkKind::ethernet, 0, "", false};
+    check(astralia::network_changes(home, home).empty(), "unchanged network sends nothing");
+    check(astralia::network_changes(home, {NetworkKind::wifi, 30, "home", false}).empty(),
+          "signal change sends nothing");
+    check(astralia::network_changes(none, home) == Messages{{"Connected", "Connected to home"}},
+          "Wi-Fi connect");
+    check(astralia::network_changes(home, none) ==
+              Messages{{"Disconnected", "Disconnected from home"}},
+          "Wi-Fi disconnect");
+    check(astralia::network_changes(home, cafe) == Messages{{"Connected", "Connected to cafe"}},
+          "Wi-Fi switch");
+    check(astralia::network_changes(none, wired) ==
+              Messages{{"Connected", "Connected via Ethernet"}},
+          "Ethernet up");
+    check(astralia::network_changes(wired, none) ==
+              Messages{{"Disconnected", "Ethernet disconnected"}},
+          "Ethernet down");
+    check(astralia::network_changes(cafe, portal) ==
+              Messages{{"Captive Portal", "Sign in required for cafe"}},
+          "captive portal");
+    astralia::BluetoothStatus idle{true, true, false, ""};
+    astralia::BluetoothStatus buds{true, true, true, "Buds"};
+    check(astralia::bluetooth_changes(idle, idle).empty(), "unchanged Bluetooth sends nothing");
+    check(astralia::bluetooth_changes(idle, {true, false, false, ""}).empty(),
+          "power off sends nothing");
+    check(astralia::bluetooth_changes(idle, buds) == Messages{{"Connected", "Connected to Buds"}},
+          "Bluetooth connect");
+    check(astralia::bluetooth_changes(buds, idle) ==
+              Messages{{"Disconnected", "Disconnected from Buds"}},
+          "Bluetooth disconnect");
 }
 
 void check_workspace_row() {
@@ -338,10 +381,11 @@ void check_notification_layout() {
           "stack sits 10 px from the bottom-right corner");
     astralia::StackOrigin offset = astralia::notification_stack_origin({1920, 0, 1280, 1024}, 50.0);
     check(offset.x == 1920 + 1280 - 410 && offset.y == 1024 - 60, "stack follows output offset");
-    check(astralia::notification_at(0.0, heights) == 0, "top card hits");
-    check(!astralia::notification_at(54.0, heights), "gap between cards hits nothing");
-    check(astralia::notification_at(58.0, heights) == 1, "second card hits");
-    check(!astralia::notification_at(130.0, heights), "below the stack hits nothing");
+    check(astralia::notification_close_at(390.0, 0.0, heights) == 0, "top card x hits");
+    check(astralia::notification_close_at(390.0, 60.0, heights) == 1, "second card x hits");
+    check(!astralia::notification_close_at(200.0, 0.0, heights), "card body hits nothing");
+    check(!astralia::notification_close_at(390.0, 45.0, heights), "below the x hits nothing");
+    check(!astralia::notification_close_at(390.0, 130.0, heights), "below the stack hits nothing");
 }
 
 } // namespace
@@ -366,6 +410,7 @@ int main() {
     check_logout_layout();
     check_polkit_layout();
     check_notification_layout();
+    check_status_changes();
     if (failures > 0) {
         std::println(stderr, "{} check(s) failed", failures);
         return EXIT_FAILURE;

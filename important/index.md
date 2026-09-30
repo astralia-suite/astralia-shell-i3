@@ -63,15 +63,15 @@
 - `logout_config.h`: Logout button ring geometry, Yuji Mai glyph font, colors, logo file and the 8-entry glyph/command action table.
 - `launcher_config.h`: Launcher geometry, fonts, colors, launch commands, search limits, and result, submenu and visit plain types.
 - `polkit_config.h`: Polkit card geometry, line heights, fonts, colors, prompt texts and echo glyph file.
-- `notification_config.h`: Notification stack margins, spacing, 480 px stack cap, 400 px card geometry, wrap width, app/title/body fonts, colors and the fixed 1.5 s `hang_time`.
+- `notification_config.h`: Notification stack margins, spacing, 480 px stack cap, 400 px card geometry, wrap width, close x size, app/title/body fonts, colors and the fixed 5 s `hang_time`.
 - `wallpaper_config.h`: Wallpaper config file path under the config dir, `*` wildcard output key, fallback color.
 
 ## `src/modules/`
 
-- `bar.{h,cpp}`: Top dock with inset pill-shaped panel, EWMH hints and strut; owns services; logout and workspaces left, clock center, status right; logout click dispatches `logout` IPC; periodic `malloc_trim`.
+- `bar.{h,cpp}`: Top dock with inset pill-shaped panel, EWMH hints and strut; owns services; logout and workspaces left, clock center, status right; logout click dispatches `logout` IPC; sends status-change `Notify` on the session bus; periodic `malloc_trim`.
 - `launcher.{h,cpp}`: `launcher` / `launcher global` IPC toggle; override-redirect overlay on the pointer's output; takes input focus, closes on focus loss; `malloc_trim` on close.
 - `logout.{h,cpp}`: `logout` IPC toggle; override-redirect overlay on the pointer's output with 8 glyph buttons around the logo; keys, hover, click run actions.
-- `notification.{h,cpp}`: Owns `NotificationService`; unfocusable override-redirect card stack at the pointer output's bottom right; click dismisses.
+- `notification.{h,cpp}`: Owns `NotificationService`; unfocusable override-redirect card stack at the pointer output's bottom right; top-right x dismisses a card.
 - `polkit.{h,cpp}`: Owns `PolkitService`; override-redirect card on the pointer's output while a request is pending; masked password, `Enter` submits, `Escape` cancels.
 - `wallpaper.{h,cpp}`: Per-output root pixmap from `wallpaper.conf` via `_XROOTPMAP_ID`, cleared on exit; repaints on RandR or `inotify` changes, then `malloc_trim`.
 
@@ -100,7 +100,7 @@
 
 ## `src/modules/notification/`
 
-- `layout.{h,cpp}`: `notification_card_height()` from measured text, `notification_fit_count()` under the stack cap, stack height, bottom-right `notification_stack_origin()` and click hit-test `notification_at()`.
+- `layout.{h,cpp}`: `notification_card_height()` from measured text, `notification_fit_count()` under the stack cap, stack height, bottom-right `notification_stack_origin()` and close-x hit-test `notification_close_at()`.
 
 ## `src/modules/polkit/`
 
@@ -114,12 +114,12 @@
 ## `src/service/`
 
 - `workspace_service.{h,cpp}`: EWMH desktop count and current desktop from root property events; `switch_to()` via client message.
-- `bluetooth_service.{h,cpp}`: BlueZ `GetManagedObjects` on a held root proxy: adapter present, powered, first connected device alias; refreshes on `org.bluez` signals.
-- `network_service.{h,cpp}`: NetworkManager type, captive portal, Wi-Fi strength and SSID via a held manager proxy; refreshes on `PropertiesChanged`.
+- `bluetooth_service.{h,cpp}`: BlueZ `GetManagedObjects` on a held root proxy: adapter present, powered, first connected device alias; refreshes on `org.bluez` signals; `bluetooth_changes()` connect/disconnect messages.
+- `network_service.{h,cpp}`: NetworkManager type, captive portal, Wi-Fi strength and SSID via a held manager proxy; refreshes on `PropertiesChanged`; `network_changes()` connect/disconnect/portal messages.
 - `polkit_service.{h,cpp}`: Polkit authentication agent on the session; drives the default `GMainContext` via an `EventLoop` poll source; request, response and info state.
 - `notification_service.{h,cpp}`: `org.freedesktop.Notifications` server on the session bus; FIFO list expiring each entry after `hang_time`.
 - `battery_service.{h,cpp}`: UPower `DisplayDevice` presence, percent, charging and full state via a held proxy; refreshes on its signals.
 
 ## `test/`
 
-- `main.cpp`: Plain check runner for `astralia-shell-test`; covers clock timing, CLI, runtime paths, help, `color()`, status icons, workspace row, wallpaper cover and config, launcher search, parsing, URLs, ranking, submenus, logout, polkit and notification layout.
+- `main.cpp`: Plain check runner for `astralia-shell-test`; covers clock timing, CLI, runtime paths, help, `color()`, status icons, workspace row, wallpaper cover and config, launcher search, parsing, URLs, ranking, submenus, logout, polkit and notification layout, network and Bluetooth change messages.

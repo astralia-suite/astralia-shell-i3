@@ -1,6 +1,7 @@
 #include <map>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "service/bluetooth_service.h"
 
@@ -25,13 +26,34 @@ std::string text(const Properties &properties, const std::string &name) {
     return it->second.get<std::string>();
 }
 
+std::string connected_device(const BluetoothStatus &status) {
+    return status.connected ? status.device : std::string();
+}
+
 } // namespace
 
-BluetoothService::BluetoothService(SystemBus &bus, std::function<void()> on_change)
-    : bus_(bus), on_change_(std::move(on_change)), root_(bus_.proxy("org.bluez", "/")) {
+std::vector<StatusMessage> bluetooth_changes(const BluetoothStatus &prev, const BluetoothStatus &next) {
+    std::string was = connected_device(prev);
+    std::string now = connected_device(next);
+    if (now == was && prev.connected == next.connected) {
+        return {};
+    }
+    if (next.connected) {
+        return {{"Connected", "Connected to " + now}};
+    }
+    return {{"Disconnected", "Disconnected from " + was}};
+}
+
+BluetoothService::BluetoothService(SystemBus &bus, std::function<void()> on_change, NotifyFn notify)
+    : bus_(bus), on_change_(std::move(on_change)), notify_(std::move(notify)),
+      root_(bus_.proxy("org.bluez", "/")) {
     refresh();
     match_ = bus_.add_match("type='signal',sender='org.bluez'", [this] {
+        BluetoothStatus prev = status_;
         if (refresh()) {
+            for (const StatusMessage &message : bluetooth_changes(prev, status_)) {
+                notify_(message);
+            }
             on_change_();
         }
     });
