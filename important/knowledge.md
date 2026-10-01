@@ -40,4 +40,5 @@ Drop an entry once newer knowledge fully supersedes it.
 - Drive GLib through an `EventLoop` poll source: prepare, query, poll, check, dispatch. Polkit's helper pipe and GDBus wakeups are dynamic fds; fixed `on_fd` misses them.
 - Wipe password buffers with `explicit_bzero` after responding or cancelling. `std::string::clear` leaves the bytes in the heap.
 - Hold one sdbus proxy per fixed object; keep changing NetworkManager paths one-off. Caching per-reconnect paths would grow without bound.
+- Config sizes are logical units; modules `cairo_scale` by `ui_scale(output)` and divide pointer coords by it. X windows, pixmaps, struts and `xcb_copy_area` stay in device pixels.
 - Call `EventLoop::reschedule()` after an event moves a timer's next deadline earlier. Deadlines are recomputed only after firing, so idle timers ignore new work.

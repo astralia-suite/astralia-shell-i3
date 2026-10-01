@@ -157,6 +157,8 @@ void Logout::place(const OutputGeometry &output) {
     xcb_create_pixmap(conn, depth_, pixmap_, window_, output.width, output.height);
     surface_ = cairo_xcb_surface_create(conn, pixmap_, visual_, output.width, output.height);
     cr_ = cairo_create(surface_);
+    scale_ = ui_scale(output);
+    cairo_scale(cr_, scale_, scale_);
     if (output != geometry_) {
         std::array<uint32_t, 4> values{static_cast<uint32_t>(output.x),
                                        static_cast<uint32_t>(output.y), output.width,
@@ -228,13 +230,13 @@ void Logout::handle(const xcb_generic_event_t &event) {
     case XCB_BUTTON_PRESS: {
         const auto &press = reinterpret_cast<const xcb_button_press_event_t &>(event);
         if (open_ && press.detail == XCB_BUTTON_INDEX_1) {
-            click(press.event_x, press.event_y);
+            click(press.event_x / scale_, press.event_y / scale_);
         }
         break;
     }
     case XCB_MOTION_NOTIFY: {
         const auto &motion = reinterpret_cast<const xcb_motion_notify_event_t &>(event);
-        hover(button_at(motion.event_x, motion.event_y));
+        hover(button_at(motion.event_x / scale_, motion.event_y / scale_));
         break;
     }
     case XCB_LEAVE_NOTIFY:
@@ -307,7 +309,8 @@ void Logout::execute(int index) {
 }
 
 std::optional<int> Logout::button_at(double x, double y) const {
-    return logout_button_at({x, y}, {geometry_.width / 2.0, geometry_.height / 2.0});
+    return logout_button_at({x, y},
+                            {geometry_.width / scale_ / 2.0, geometry_.height / scale_ / 2.0});
 }
 
 void Logout::paint() {
@@ -317,7 +320,7 @@ void Logout::paint() {
     cairo_paint(cr);
     cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
 
-    Point center{geometry_.width / 2.0, geometry_.height / 2.0};
+    Point center{geometry_.width / scale_ / 2.0, geometry_.height / scale_ / 2.0};
     for (int i = 0; i < cfg::button_count; ++i) {
         bool highlighted = i == selected_ || i == hovered_;
         double scale = highlighted ? cfg::highlight_scale : 1.0;

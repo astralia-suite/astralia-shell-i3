@@ -50,6 +50,7 @@ class Bar {
     void redraw_status();
     void notify(const std::string &app, const StatusMessage &message);
     void present(const Rect &rect);
+    void copy(const Rect &rect);
     void click(const xcb_button_press_event_t &event);
     void hover(std::optional<int> x);
     Rect clock_rect() const;
@@ -58,6 +59,7 @@ class Bar {
     IpcServer &ipc_;
     uint16_t width_;
     uint16_t height_;
+    double scale_;
     Rect panel_{};
     xcb_colormap_t colormap_;
     xcb_window_t window_;

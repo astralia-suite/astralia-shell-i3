@@ -380,7 +380,8 @@ void check_notification_layout() {
     check(origin.x == 1920 - 10 - 400 && origin.y == 1080 - 10 - 130,
           "stack sits 10 px from the bottom-right corner");
     astralia::StackOrigin offset = astralia::notification_stack_origin({1920, 0, 1280, 1024}, 50.0);
-    check(offset.x == 1920 + 1280 - 410 && offset.y == 1024 - 60, "stack follows output offset");
+    check(offset.x == 1920 + 1280 - 7 - 267 && offset.y == 1024 - 7 - 34,
+          "stack follows output offset and scale");
     check(astralia::notification_close_at(390.0, 0.0, heights) == 0, "top card x hits");
     check(astralia::notification_close_at(390.0, 60.0, heights) == 1, "second card x hits");
     check(!astralia::notification_close_at(200.0, 0.0, heights), "card body hits nothing");

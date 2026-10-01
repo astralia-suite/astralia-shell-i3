@@ -49,6 +49,7 @@ class Logout {
     cairo_surface_t *surface_ = nullptr;
     cairo_t *cr_ = nullptr;
     OutputGeometry geometry_{};
+    double scale_ = 1.0;
     Keyboard keyboard_;
     bool fonts_ = register_app_fonts();
     Text glyph_;

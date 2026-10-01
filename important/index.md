@@ -46,7 +46,7 @@
 - `ipc.{h,cpp}`: Unix socket `IpcServer` with verb handlers (built-in `help`, `kill`), in-process `dispatch()`, `format_help()`, and `run_ipc_client()`.
 - `unique_fd.h`: Move-only RAII file descriptor.
 - `log.{h,cpp}`: `log::info` and `log::error` formatted messages to stderr.
-- `x_connection.{h,cpp}`: RAII xcb connection (syncs before disconnect, cairo MIT-SHM disabled) with screen, root and ARGB visuals, EWMH, atoms, RandR outputs.
+- `x_connection.{h,cpp}`: RAII xcb connection (syncs before disconnect, cairo MIT-SHM disabled) with screen, root and ARGB visuals, EWMH, atoms, RandR outputs; `ui_scale(output)` gives the per-output UI scale (`output.width / 1920`).
 - `event_loop.{h,cpp}`: `poll()` loop over X, `signalfd`, a `CLOCK_BOOTTIME` `timerfd`, extra fds and prepare/dispatch poll sources; window and event-type handlers, timers with `reschedule()`, `stop()`.
 - `text.{h,cpp}`: Cached `PangoLayout` with a fixed font; set text, optional word wrap, measure pixel size, draw (vertically or ink centered) on cairo.
 - `keyboard.{h,cpp}`: xkbcommon-x11 keymap; translates key presses, with modifiers from the event, to text, backspace, arrows, enter, escape.

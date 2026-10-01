@@ -116,8 +116,11 @@ void Notifications::sync() {
     shown_.assign(list.begin() + skip, list.end());
     heights_.erase(heights_.begin(), heights_.begin() + skip);
     double stack_height = notification_stack_height(heights_);
-    StackOrigin origin = notification_stack_origin(pointer_output(), stack_height);
-    place(origin.x, origin.y, cfg::card_width, static_cast<uint16_t>(std::ceil(stack_height)));
+    OutputGeometry output = pointer_output();
+    double scale = ui_scale(output);
+    StackOrigin origin = notification_stack_origin(output, stack_height);
+    place(origin.x, origin.y, static_cast<uint16_t>(std::ceil(cfg::card_width * scale)),
+          static_cast<uint16_t>(std::ceil(stack_height * scale)), scale);
     paint();
     uint32_t above = XCB_STACK_MODE_ABOVE;
     xcb_configure_window(conn, window_, XCB_CONFIG_WINDOW_STACK_MODE, &above);
@@ -128,10 +131,11 @@ void Notifications::sync() {
     xcb_flush(conn);
 }
 
-void Notifications::place(int x, int y, uint16_t width, uint16_t height) {
+void Notifications::place(int x, int y, uint16_t width, uint16_t height, double scale) {
     xcb_connection_t *conn = x_.conn();
     OutputGeometry target{static_cast<int16_t>(x), static_cast<int16_t>(y), width, height};
-    if (width != geometry_.width || height != geometry_.height || cr_ == nullptr) {
+    if (width != geometry_.width || height != geometry_.height || scale != scale_ ||
+        cr_ == nullptr) {
         if (cr_ != nullptr) {
             cairo_destroy(cr_);
             cairo_surface_destroy(surface_);
@@ -141,6 +145,8 @@ void Notifications::place(int x, int y, uint16_t width, uint16_t height) {
         xcb_create_pixmap(conn, depth_, pixmap_, window_, width, height);
         surface_ = cairo_xcb_surface_create(conn, pixmap_, visual_, width, height);
         cr_ = cairo_create(surface_);
+        scale_ = scale;
+        cairo_scale(cr_, scale_, scale_);
     }
     if (target != geometry_) {
         std::array<uint32_t, 4> values{static_cast<uint32_t>(x), static_cast<uint32_t>(y), width,
@@ -182,7 +188,7 @@ void Notifications::handle(const xcb_generic_event_t &event) {
         break;
     case XCB_BUTTON_PRESS: {
         const auto &press = reinterpret_cast<const xcb_button_press_event_t &>(event);
-        if (auto index = notification_close_at(press.event_x, press.event_y, heights_)) {
+        if (auto index = notification_close_at(press.event_x / scale_, press.event_y / scale_, heights_)) {
             service_.dismiss(shown_[*index].id);
         }
         break;
