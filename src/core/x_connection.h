@@ -21,8 +21,6 @@ struct OutputGeometry {
     bool operator==(const OutputGeometry &) const = default;
 };
 
-inline double ui_scale(const OutputGeometry &output) { return output.width / 1920.0; }
-
 struct Output {
     std::string name;
     OutputGeometry geometry;

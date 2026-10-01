@@ -2,7 +2,6 @@
 #include <array>
 #include <cairo-xcb.h>
 #include <chrono>
-#include <cmath>
 #include <malloc.h>
 #include <map>
 #include <numbers>
@@ -55,13 +54,10 @@ Bar::Bar(XConnection &x, EventLoop &loop, IpcServer &ipc) : x_(x), ipc_(ipc) {
     status_ = std::make_unique<StatusWidget>();
     xcb_connection_t *conn = x_.conn();
     OutputGeometry output = x_.primary_output();
-    scale_ = ui_scale(output);
     width_ = output.width;
-    height_ = static_cast<uint16_t>(
-        std::ceil((bar_config::margin_top + bar_config::height) * scale_));
-    int logical_width = static_cast<int>(std::lround(width_ / scale_));
-    panel_ = {bar_config::margin_x, bar_config::margin_top,
-              logical_width - 2 * bar_config::margin_x, bar_config::height};
+    height_ = bar_config::margin_top + bar_config::height;
+    panel_ = {bar_config::margin_x, bar_config::margin_top, width_ - 2 * bar_config::margin_x,
+              bar_config::height};
 
     xcb_visualtype_t *visual = x_.argb_visual();
     uint8_t depth = 32;
@@ -92,7 +88,6 @@ Bar::Bar(XConnection &x, EventLoop &loop, IpcServer &ipc) : x_(x), ipc_(ipc) {
     xcb_create_gc(conn, gc_, pixmap_, XCB_GC_GRAPHICS_EXPOSURES, &graphics_exposures);
     surface_ = cairo_xcb_surface_create(conn, pixmap_, visual, width_, height_);
     cr_ = cairo_create(surface_);
-    cairo_scale(cr_, scale_, scale_);
 
     bus_ = std::make_unique<SystemBus>(loop);
     workspaces_ = std::make_unique<WorkspaceService>(x_, loop, [this] { draw_all(); });
@@ -114,15 +109,14 @@ Bar::Bar(XConnection &x, EventLoop &loop, IpcServer &ipc) : x_(x), ipc_(ipc) {
         switch (event.response_type & ~0x80) {
         case XCB_EXPOSE: {
             const auto &expose = reinterpret_cast<const xcb_expose_event_t &>(event);
-            copy({expose.x, expose.y, expose.width, expose.height});
+            present({expose.x, expose.y, expose.width, expose.height});
             break;
         }
         case XCB_BUTTON_PRESS:
             click(reinterpret_cast<const xcb_button_press_event_t &>(event));
             break;
         case XCB_MOTION_NOTIFY:
-            hover(static_cast<int>(
-                reinterpret_cast<const xcb_motion_notify_event_t &>(event).event_x / scale_));
+            hover(reinterpret_cast<const xcb_motion_notify_event_t &>(event).event_x);
             break;
         case XCB_LEAVE_NOTIFY:
             hover(std::nullopt);
@@ -191,6 +185,7 @@ void Bar::paint_panel() {
 }
 
 void Bar::draw_all() {
+    Rect whole{0, 0, width_, height_};
     cairo_set_operator(cr_, CAIRO_OPERATOR_SOURCE);
     cairo_set_source_rgba(cr_, 0, 0, 0, 0);
     cairo_paint(cr_);
@@ -216,7 +211,7 @@ void Bar::draw_all() {
     status_rect_ = {panel_.x + panel_.width - bar_config::padding_x - status_width, panel_.y,
                     status_width, panel_.height};
     status_->draw(cr_, status_rect_.x, panel_.y, panel_.height);
-    copy({0, 0, width_, height_});
+    present(whole);
 }
 
 void Bar::draw_clock() {
@@ -264,11 +259,10 @@ void Bar::click(const xcb_button_press_event_t &event) {
     if (event.detail != XCB_BUTTON_INDEX_1) {
         return;
     }
-    int x = static_cast<int>(event.event_x / scale_);
-    if (logout_rect_.contains(x)) {
+    if (logout_rect_.contains(event.event_x)) {
         ipc_.dispatch("logout");
-    } else if (workspace_rect_.contains(x)) {
-        if (auto index = workspace_at(workspaces_->status(), x - workspace_rect_.x)) {
+    } else if (workspace_rect_.contains(event.event_x)) {
+        if (auto index = workspace_at(workspaces_->status(), event.event_x - workspace_rect_.x)) {
             workspaces_->switch_to(*index);
         }
     }
@@ -287,15 +281,6 @@ void Bar::hover(std::optional<int> x) {
 }
 
 void Bar::present(const Rect &rect) {
-    int left = static_cast<int>(std::floor(rect.x * scale_));
-    int top = static_cast<int>(std::floor(rect.y * scale_));
-    int right = std::min<int>(static_cast<int>(std::ceil((rect.x + rect.width) * scale_)), width_);
-    int bottom =
-        std::min<int>(static_cast<int>(std::ceil((rect.y + rect.height) * scale_)), height_);
-    copy({left, top, right - left, bottom - top});
-}
-
-void Bar::copy(const Rect &rect) {
     cairo_surface_flush(surface_);
     xcb_copy_area(x_.conn(), pixmap_, window_, gc_, rect.x, rect.y, rect.x, rect.y, rect.width,
                   rect.height);

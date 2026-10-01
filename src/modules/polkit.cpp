@@ -174,8 +174,6 @@ void Polkit::place(const OutputGeometry &output) {
         xcb_create_pixmap(conn, depth_, pixmap_, window_, output.width, output.height);
         surface_ = cairo_xcb_surface_create(conn, pixmap_, visual_, output.width, output.height);
         cr_ = cairo_create(surface_);
-        scale_ = ui_scale(output);
-        cairo_scale(cr_, scale_, scale_);
     }
     if (output != geometry_) {
         std::array<uint32_t, 4> values{static_cast<uint32_t>(output.x),
@@ -303,8 +301,8 @@ void Polkit::paint() {
     bool show_info = !info.empty() && !info_error;
 
     double card_h = polkit_card_height(show_info);
-    double card_x = (geometry_.width / scale_ - cfg::card_width) / 2.0;
-    double card_y = (geometry_.height / scale_ - card_h) / 2.0;
+    double card_x = (geometry_.width - cfg::card_width) / 2.0;
+    double card_y = (geometry_.height - card_h) / 2.0;
 
     cairo_t *cr = cr_;
     cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);

@@ -23,7 +23,7 @@ class Notifications {
 
   private:
     void sync();
-    void place(int x, int y, uint16_t width, uint16_t height, double scale);
+    void place(int x, int y, uint16_t width, uint16_t height);
     OutputGeometry pointer_output() const;
     void handle(const xcb_generic_event_t &event);
     double measure(const Notification &n);
@@ -40,7 +40,6 @@ class Notifications {
     cairo_surface_t *surface_ = nullptr;
     cairo_t *cr_ = nullptr;
     OutputGeometry geometry_{};
-    double scale_ = 1.0;
     bool fonts_ = register_app_fonts();
     Text app_;
     Text summary_;

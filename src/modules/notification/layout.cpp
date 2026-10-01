@@ -42,11 +42,8 @@ double notification_stack_height(std::span<const double> heights) {
 }
 
 StackOrigin notification_stack_origin(const OutputGeometry &output, double stack_height) {
-    double scale = ui_scale(output);
-    return {output.x + output.width - static_cast<int>(std::lround(cfg::margin_right * scale)) -
-                static_cast<int>(std::ceil(cfg::card_width * scale)),
-            output.y + output.height - static_cast<int>(std::lround(cfg::margin_bottom * scale)) -
-                static_cast<int>(std::ceil(stack_height * scale))};
+    return {output.x + output.width - cfg::margin_right - cfg::card_width,
+            output.y + output.height - cfg::margin_bottom - static_cast<int>(std::ceil(stack_height))};
 }
 
 std::optional<std::size_t> notification_close_at(double x, double y, std::span<const double> heights) {
