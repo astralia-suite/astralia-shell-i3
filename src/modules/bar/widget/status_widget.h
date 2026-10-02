@@ -8,6 +8,7 @@
 
 #include "core/text.h"
 
+#include "service/audio_service.h"
 #include "service/battery_service.h"
 #include "service/bluetooth_service.h"
 #include "service/network_service.h"
@@ -23,7 +24,7 @@ std::string battery_label(const BatteryStatus &status);
 class StatusWidget {
   public:
     void update(const BluetoothStatus &bluetooth, const NetworkStatus &network,
-                const BatteryStatus &battery);
+                const AudioLevel &volume, const BatteryStatus &battery);
     bool hover(std::optional<int> offset);
     int width() const;
     void draw(cairo_t *cr, double x, int top, int height) const;
@@ -38,7 +39,7 @@ class StatusWidget {
         int width(bool show_label) const;
     };
 
-    std::array<Item, 3> items_;
+    std::array<Item, 4> items_;
     std::optional<std::size_t> hovered_;
 };
 

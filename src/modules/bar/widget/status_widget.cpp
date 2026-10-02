@@ -86,13 +86,16 @@ int StatusWidget::Item::width(bool show_label) const {
 }
 
 void StatusWidget::update(const BluetoothStatus &bluetooth, const NetworkStatus &network,
-                          const BatteryStatus &battery) {
-    auto &[bluetooth_item, network_item, battery_item] = items_;
+                          const AudioLevel &volume, const BatteryStatus &battery) {
+    auto &[bluetooth_item, network_item, volume_item, battery_item] = items_;
     bluetooth_item.visible = bluetooth.present;
     bluetooth_item.icon.set(bluetooth_icon(bluetooth));
     bluetooth_item.label.set(bluetooth_label(bluetooth));
     network_item.icon.set(network_icon(network));
     network_item.label.set(network.kind == NetworkKind::wifi ? network.ssid : "");
+    volume_item.visible = volume.present;
+    volume_item.icon.set(icon::volume_threshold(volume.muted, volume.percent));
+    volume_item.label.set(volume.muted ? "Muted" : std::format("{}%", volume.percent));
     battery_item.visible = battery.present;
     battery_item.icon.set(battery_icon(battery));
     battery_item.label.set(battery.present ? battery_label(battery) : "");

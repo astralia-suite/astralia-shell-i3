@@ -240,6 +240,12 @@ void ControlCenterPanel::press(int x, int y, xcb_button_t button) {
     int percent = sliders_[*row].percent;
     switch (button) {
     case XCB_BUTTON_INDEX_1:
+        if (*row == volume && x < track_x()) {
+            sliders_[volume].muted = !sliders_[volume].muted;
+            audio_.set_sink_mute(sliders_[volume].muted);
+            paint();
+            break;
+        }
         dragging_ = row;
         apply(*row, slider_percent_at(track_x(), track_width(), x));
         break;
@@ -314,11 +320,19 @@ void ControlCenterPanel::paint() {
     constexpr int track_height = bar_config::control_center_track_height;
     for (std::size_t i = 0; i < sliders_.size(); ++i) {
         Slider &slider = sliders_[i];
-        slider.label.set(slider.enabled ? std::format("{}%", slider.percent) : "-");
+        if (!slider.enabled) {
+            slider.label.set("-");
+        } else if (slider.muted) {
+            slider.label.set("muted");
+        } else {
+            slider.label.set(std::format("{}%", slider.percent));
+        }
         int top = bar_config::control_center_padding +
                   static_cast<int>(i) * bar_config::control_center_row_height;
         double center_y = top + bar_config::control_center_row_height / 2.0;
-        set_source(cr_, slider.enabled ? bar_config::foreground : palette::text_dim);
+        set_source(cr_, !slider.enabled ? palette::text_dim
+                        : slider.muted  ? palette::text_muted
+                                        : bar_config::foreground);
         slider.icon.draw_centered(cr_, bar_config::control_center_padding, top,
                                   bar_config::control_center_row_height);
         slider.label.draw_centered(cr_, width_ - bar_config::control_center_padding - slider.label.width(),
@@ -328,7 +342,7 @@ void ControlCenterPanel::paint() {
         rounded_rect(cr_, track_left, track_top, track_span, track_height, track_height / 2.0);
         cairo_fill(cr_);
         if (slider.enabled && slider.percent > 0) {
-            set_source(cr_, bar_config::control_center_fill);
+            set_source(cr_, slider.muted ? palette::text_muted : bar_config::control_center_fill);
             rounded_rect(cr_, track_left, track_top, track_span * slider.percent / 100.0,
                          track_height, track_height / 2.0);
             cairo_fill(cr_);

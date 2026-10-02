@@ -38,7 +38,7 @@ inline constexpr int control_center_track_height = 6;
 inline constexpr int control_center_icon_slot = 28;
 inline constexpr int control_center_gap = 12;
 inline constexpr int control_center_wheel_step = 5;
-inline constexpr const char *control_center_percent_sample = "100%";
+inline constexpr const char *control_center_percent_sample = "muted";
 inline constexpr Color control_center_track = palette::text_alpha20;
 inline constexpr Color control_center_fill = palette::accent;
 

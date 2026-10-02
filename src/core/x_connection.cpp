@@ -14,7 +14,8 @@ struct Free {
     void operator()(void *reply) const { std::free(reply); }
 };
 
-template <typename T> std::unique_ptr<T, Free> owned(T *reply) {
+template <typename T>
+std::unique_ptr<T, Free> owned(T *reply) {
     return std::unique_ptr<T, Free>(reply);
 }
 

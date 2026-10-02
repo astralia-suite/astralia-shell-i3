@@ -97,12 +97,17 @@ Bar::Bar(XConnection &x, EventLoop &loop, IpcServer &ipc, Services &services)
     services_.network.changed.connect([this] { redraw_status(); });
     services_.network.messages.connect(
         [this](const StatusMessage &message) { notify("Network", message); });
+    services_.audio.changed.connect([this](AudioKind kind) {
+        if (kind == AudioKind::sink) {
+            redraw_status();
+        }
+    });
     services_.battery.changed.connect([this] { redraw_status(); });
     control_center_panel_ = std::make_unique<ControlCenterPanel>(x_, loop, services_);
 
     clock_->refresh();
     status_->update(services_.bluetooth.status(), services_.network.status(),
-                    services_.battery.status());
+                    services_.audio.sink(), services_.battery.status());
     draw_all();
 
     loop.on_window(window_, [this](const xcb_generic_event_t &event) {
@@ -201,7 +206,6 @@ void Bar::draw_all() {
     cairo_set_operator(cr_, CAIRO_OPERATOR_OVER);
     paint_panel();
 
-    // Left region grows rightward from the left edge.
     set_source(cr_, bar_config::foreground);
     logout_rect_ = {panel_.x + bar_config::padding_x, panel_.y, logout_->width(), panel_.height};
     logout_->draw(cr_, logout_rect_.x, panel_.y, panel_.height);
@@ -211,11 +215,9 @@ void Bar::draw_all() {
     draw_workspace_row(cr_, workspaces, workspace_rect_.x, panel_.y, panel_.height);
     draw_divider(logout_rect_, workspace_rect_);
 
-    // Center region grows outward from the panel center.
     clock_rect_ = clock_rect();
     draw_clock();
 
-    // Right region grows leftward from the right edge.
     set_source(cr_, bar_config::foreground);
     int control_center_width = control_center_->width();
     control_center_rect_ = {panel_.x + panel_.width - bar_config::padding_x - control_center_width,
@@ -251,7 +253,7 @@ void Bar::redraw_clock() {
 
 void Bar::redraw_status() {
     status_->update(services_.bluetooth.status(), services_.network.status(),
-                    services_.battery.status());
+                    services_.audio.sink(), services_.battery.status());
     draw_all();
 }
 

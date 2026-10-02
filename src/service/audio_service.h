@@ -29,6 +29,7 @@ class AudioService {
     AudioLevel sink() const;
     AudioLevel source() const;
     void set_sink_volume(int percent);
+    void set_sink_mute(bool muted);
 
     Signal<AudioKind> changed;
 

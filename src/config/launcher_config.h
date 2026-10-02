@@ -95,7 +95,12 @@ struct ScoredApp {
     float score;
 };
 
-enum class LauncherMode { drun, run, google, duckduckgo, youtube, url };
+enum class LauncherMode { drun,
+                          run,
+                          google,
+                          duckduckgo,
+                          youtube,
+                          url };
 
 struct ModeQuery {
     LauncherMode mode;
@@ -103,7 +108,9 @@ struct ModeQuery {
 };
 
 struct DrunResult {
-    enum class Kind { app, dir, file } kind;
+    enum class Kind { app,
+                      dir,
+                      file } kind;
     const DesktopEntry *app = nullptr;
     FileEntry file;
 };
@@ -113,7 +120,10 @@ struct VisitStore {
     std::string path;
 };
 
-enum class SubmenuScreen { search, browse, dir_actions, file_actions };
+enum class SubmenuScreen { search,
+                           browse,
+                           dir_actions,
+                           file_actions };
 
 struct SubmenuEntry {
     enum class Action {

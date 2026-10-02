@@ -366,6 +366,23 @@ struct AudioService::Impl {
         auto *props = static_cast<spa_pod *>(spa_pod_builder_add_object(
             &builder, SPA_TYPE_OBJECT_Props, SPA_PARAM_Props, SPA_PROP_channelVolumes,
             SPA_POD_Array(sizeof(float), SPA_TYPE_Float, volumes.size(), volumes.data())));
+        set_props(node, builder, props);
+    }
+
+    void set_mute(uint32_t id, bool muted) {
+        auto it = nodes.find(id);
+        if (it == nodes.end()) {
+            return;
+        }
+        std::array<uint8_t, 1024> buffer{};
+        spa_pod_builder builder = SPA_POD_BUILDER_INIT(buffer.data(), buffer.size());
+        auto *props = static_cast<spa_pod *>(spa_pod_builder_add_object(
+            &builder, SPA_TYPE_OBJECT_Props, SPA_PARAM_Props, SPA_PROP_mute,
+            SPA_POD_Bool(muted)));
+        set_props(it->second, builder, props);
+    }
+
+    void set_props(Node &node, spa_pod_builder &builder, spa_pod *props) {
         auto device = devices.find(node.device_id);
         if (node.card_profile_device >= 0 && device != devices.end()) {
             auto route = device->second.route_index.find(node.card_profile_device);
@@ -441,6 +458,10 @@ AudioLevel AudioService::source() const { return impl_->level(impl_->source_id);
 
 void AudioService::set_sink_volume(int percent) {
     impl_->set_volume(impl_->sink_id, percent);
+}
+
+void AudioService::set_sink_mute(bool muted) {
+    impl_->set_mute(impl_->sink_id, muted);
 }
 
 } // namespace astralia
