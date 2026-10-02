@@ -5,18 +5,18 @@
 #include <vector>
 #include <xcb/xcb.h>
 
+#include "app/services.h"
+
 #include "core/app_fonts.h"
 #include "core/event_loop.h"
 #include "core/text.h"
 #include "core/x_connection.h"
 
-#include "service/notification_service.h"
-
 namespace astralia {
 
 class Notifications {
   public:
-    Notifications(XConnection &x, EventLoop &loop);
+    Notifications(XConnection &x, EventLoop &loop, Services &services);
     ~Notifications();
     Notifications(const Notifications &) = delete;
     Notifications &operator=(const Notifications &) = delete;
@@ -47,7 +47,7 @@ class Notifications {
     std::vector<Notification> shown_;
     std::vector<double> heights_;
     bool mapped_ = false;
-    NotificationService service_;
+    NotificationService &service_;
 };
 
 } // namespace astralia

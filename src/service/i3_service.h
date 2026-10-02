@@ -1,29 +1,31 @@
 #pragma once
 
 #include <cstdint>
-#include <functional>
 #include <string>
 #include <string_view>
 
 #include "core/event_loop.h"
+#include "core/signal.h"
 #include "core/x_connection.h"
 
 namespace astralia {
 
-struct WorkspaceStatus {
+struct I3Status {
     uint32_t count = 0;
     uint32_t current = 0;
     uint32_t occupied = 0;
 
-    bool operator==(const WorkspaceStatus &) const = default;
+    bool operator==(const I3Status &) const = default;
 };
 
-class WorkspaceService {
+class I3Service {
   public:
-    WorkspaceService(XConnection &x, EventLoop &loop, std::function<void()> on_change);
+    I3Service(XConnection &x, EventLoop &loop);
 
-    const WorkspaceStatus &status() const { return status_; }
+    const I3Status &status() const { return status_; }
     void switch_to(uint32_t index);
+
+    Signal<> changed;
 
   private:
     bool refresh();
@@ -31,8 +33,7 @@ class WorkspaceService {
     void i3_command(std::string_view command);
 
     XConnection &x_;
-    std::function<void()> on_change_;
-    WorkspaceStatus status_;
+    I3Status status_;
 };
 
 } // namespace astralia

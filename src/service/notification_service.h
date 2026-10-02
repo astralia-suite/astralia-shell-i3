@@ -2,7 +2,6 @@
 
 #include <chrono>
 #include <cstdint>
-#include <functional>
 #include <map>
 #include <memory>
 #include <sdbus-c++/sdbus-c++.h>
@@ -11,6 +10,7 @@
 
 #include "core/dbus.h"
 #include "core/event_loop.h"
+#include "core/signal.h"
 
 namespace astralia {
 
@@ -25,12 +25,14 @@ struct Notification {
 
 class NotificationService {
   public:
-    NotificationService(EventLoop &loop, std::function<void()> on_change);
+    explicit NotificationService(EventLoop &loop);
     NotificationService(const NotificationService &) = delete;
     NotificationService &operator=(const NotificationService &) = delete;
 
     const std::vector<Notification> &list() const { return list_; }
     void dismiss(uint32_t id);
+
+    Signal<> changed;
 
   private:
     uint32_t notify(std::string app, uint32_t replaces_id, std::string summary, std::string body,
@@ -40,7 +42,6 @@ class NotificationService {
     std::chrono::milliseconds until_next() const;
 
     EventLoop &loop_;
-    std::function<void()> on_change_;
     SystemBus bus_;
     std::unique_ptr<sdbus::IObject> object_;
     std::vector<Notification> list_;

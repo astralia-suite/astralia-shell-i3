@@ -1,6 +1,5 @@
 #include <map>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include "service/bluetooth_service.h"
@@ -44,17 +43,16 @@ std::vector<StatusMessage> bluetooth_changes(const BluetoothStatus &prev, const 
     return {{"Disconnected", "Disconnected from " + was}};
 }
 
-BluetoothService::BluetoothService(SystemBus &bus, std::function<void()> on_change, NotifyFn notify)
-    : bus_(bus), on_change_(std::move(on_change)), notify_(std::move(notify)),
-      root_(bus_.proxy("org.bluez", "/")) {
+BluetoothService::BluetoothService(SystemBus &bus)
+    : bus_(bus), root_(bus_.proxy("org.bluez", "/")) {
     refresh();
     match_ = bus_.add_match("type='signal',sender='org.bluez'", [this] {
         BluetoothStatus prev = status_;
         if (refresh()) {
             for (const StatusMessage &message : bluetooth_changes(prev, status_)) {
-                notify_(message);
+                messages.emit(message);
             }
-            on_change_();
+            changed.emit();
         }
     });
 }

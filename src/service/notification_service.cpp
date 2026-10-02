@@ -26,8 +26,8 @@ constexpr uint8_t urgency_critical = 2;
 
 } // namespace
 
-NotificationService::NotificationService(EventLoop &loop, std::function<void()> on_change)
-    : loop_(loop), on_change_(std::move(on_change)), bus_(loop, BusKind::session) {
+NotificationService::NotificationService(EventLoop &loop)
+    : loop_(loop), bus_(loop, BusKind::session) {
     timer_ = loop_.add_timer([this] { return until_next(); }, [this] { expire(); });
     sdbus::IConnection *conn = bus_.conn();
     if (conn == nullptr) {
@@ -81,7 +81,7 @@ uint32_t NotificationService::notify(std::string app, uint32_t replaces_id, std:
     list_.push_back({id, std::move(app), std::move(summary), std::move(body), critical,
                      std::chrono::steady_clock::now() + notification_config::hang_time});
     loop_.reschedule(timer_);
-    on_change_();
+    changed.emit();
     return id;
 }
 
@@ -98,7 +98,7 @@ void NotificationService::close(uint32_t id, uint32_t reason) {
             log::error("notification: cannot emit NotificationClosed: {}", error.what());
         }
     }
-    on_change_();
+    changed.emit();
 }
 
 void NotificationService::expire() {

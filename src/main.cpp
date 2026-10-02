@@ -3,6 +3,8 @@
 #include <string_view>
 #include <vector>
 
+#include "app/services.h"
+
 #include "core/cli.h"
 #include "core/daemon.h"
 #include "core/event_loop.h"
@@ -16,6 +18,7 @@
 #include "modules/launcher.h"
 #include "modules/logout.h"
 #include "modules/notification.h"
+#include "modules/osd.h"
 #include "modules/polkit.h"
 #include "modules/wallpaper.h"
 
@@ -49,11 +52,13 @@ int main(int argc, char **argv) {
         astralia::log::error("{}", ipc.error());
         return EXIT_FAILURE;
     }
+    astralia::Services services(*x, *loop);
     astralia::Wallpaper wallpaper(*x, *loop);
-    astralia::Bar bar(*x, *loop, **ipc);
+    astralia::Bar bar(*x, *loop, **ipc, services);
     astralia::Launcher launcher(*x, *loop, **ipc);
     astralia::Logout logout(*x, *loop, **ipc);
-    astralia::Polkit polkit(*x, *loop);
-    astralia::Notifications notifications(*x, *loop);
+    astralia::Polkit polkit(*x, *loop, services);
+    astralia::Notifications notifications(*x, *loop, services);
+    astralia::Osd osd(*x, *loop, services);
     return loop->run();
 }

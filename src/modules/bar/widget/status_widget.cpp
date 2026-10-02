@@ -4,7 +4,7 @@
 
 #include "core/icons.h"
 
-#include "modules/bar/status_widget.h"
+#include "modules/bar/widget/status_widget.h"
 
 namespace astralia {
 

@@ -16,7 +16,8 @@
 
 ## Source layout
 
-- `src/main.cpp`: creates `core` objects and modules, runs the event loop; nothing else.
+- `src/main.cpp`: creates `core` objects, the shared `Services` and modules, runs the event loop; nothing else.
+- `src/app/`: process-wide shared state (`Services`); includes `core/` and `service/`, never `modules/`.
 - `src/core/`: shared infrastructure (X connection, event loop, rendering helpers, logging); includes nothing from `modules/` or `service/`.
 - `src/modules/`: user-facing shell parts (bar, launcher, …).
 - `src/config/`: per-module constants and plain data types.
@@ -40,6 +41,8 @@
 ## Service structure
 
 - `src/service/` holds as many services as needed, but limited to one pair of `**_service.{h,cpp}` per service.
+- Every service is owned by `app/services.h` and passed to modules by reference, as `hl`'s `WaylandState` does.
+- Services publish changes through `core/signal.h` members; modules `connect()` in their constructor.
 - `src/plugin/` holds `dlopen`-loaded `shared_module`s, one `**_plugin.{h,cpp}` pair each, loaded by their owning service.
 
 ## Build targets

@@ -44,9 +44,8 @@ std::vector<StatusMessage> network_changes(const NetworkStatus &prev, const Netw
     return messages;
 }
 
-NetworkService::NetworkService(SystemBus &bus, std::function<void()> on_change, NotifyFn notify)
-    : bus_(bus), on_change_(std::move(on_change)), notify_(std::move(notify)),
-      manager_(bus_.proxy(nm_service, nm_path)) {
+NetworkService::NetworkService(SystemBus &bus)
+    : bus_(bus), manager_(bus_.proxy(nm_service, nm_path)) {
     refresh();
     match_ = bus_.add_match("type='signal',sender='org.freedesktop.NetworkManager',"
                             "interface='org.freedesktop.DBus.Properties',"
@@ -55,9 +54,9 @@ NetworkService::NetworkService(SystemBus &bus, std::function<void()> on_change, 
                                 NetworkStatus prev = status_;
                                 if (refresh()) {
                                     for (const StatusMessage &message : network_changes(prev, status_)) {
-                                        notify_(message);
+                                        messages.emit(message);
                                     }
-                                    on_change_();
+                                    changed.emit();
                                 }
                             });
 }

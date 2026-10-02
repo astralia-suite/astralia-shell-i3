@@ -1,3 +1,4 @@
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -15,9 +16,10 @@
 #include "core/palette.h"
 #include "core/runtime_paths.h"
 
-#include "modules/bar/clock_widget.h"
-#include "modules/bar/status_widget.h"
-#include "modules/bar/workspace_widget.h"
+#include "modules/bar/panel/control_center_panel.h"
+#include "modules/bar/widget/clock_widget.h"
+#include "modules/bar/widget/status_widget.h"
+#include "modules/bar/widget/workspace_widget.h"
 #include "modules/launcher/app_icon.h"
 #include "modules/launcher/apps_provider.h"
 #include "modules/launcher/desktop_entry.h"
@@ -32,6 +34,7 @@
 #include "modules/wallpaper/config_file.h"
 #include "modules/wallpaper/image.h"
 
+#include "service/audio_service.h"
 #include "service/bluetooth_service.h"
 #include "service/network_service.h"
 
@@ -186,7 +189,7 @@ void check_status_changes() {
 
 void check_workspace_row() {
     using astralia::workspace_at;
-    astralia::WorkspaceStatus status{3, 1};
+    astralia::I3Status status{3, 1};
     check(astralia::workspace_row_width(status) == 10 + 6 + 26 + 6 + 10, "active pill is wider");
     check(workspace_at(status, 0) == 0u, "first pill");
     check(workspace_at(status, 20) == 1u, "active pill");
@@ -390,6 +393,23 @@ void check_notification_layout() {
 
 } // namespace
 
+void check_control_center() {
+    using astralia::audio_percent;
+    using astralia::slider_percent_at;
+    std::array<float, 2> forty{0.064f, 0.064f};
+    check(audio_percent(forty) == 40, "audio equal channels");
+    std::array<float, 2> uneven{0.0f, 1.0f};
+    check(audio_percent(uneven) == 50, "audio uneven channels average");
+    std::array<float, 1> full{1.0f};
+    check(audio_percent(full) == 100, "audio full volume");
+    check(audio_percent({}) == 0, "audio no channels");
+    check(slider_percent_at(10, 200, 10) == 0, "slider left edge");
+    check(slider_percent_at(10, 200, 210) == 100, "slider right edge");
+    check(slider_percent_at(10, 200, 110) == 50, "slider middle");
+    check(slider_percent_at(10, 200, -50) == 0, "slider clamps left");
+    check(slider_percent_at(10, 200, 500) == 100, "slider clamps right");
+}
+
 int main() {
     check_ms_until_next_second();
     check_parse_invocation();
@@ -411,6 +431,7 @@ int main() {
     check_polkit_layout();
     check_notification_layout();
     check_status_changes();
+    check_control_center();
     if (failures > 0) {
         std::println(stderr, "{} check(s) failed", failures);
         return EXIT_FAILURE;

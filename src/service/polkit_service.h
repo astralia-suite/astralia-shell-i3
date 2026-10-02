@@ -1,16 +1,16 @@
 #pragma once
 
-#include <functional>
 #include <memory>
 #include <string>
 
 #include "core/event_loop.h"
+#include "core/signal.h"
 
 namespace astralia {
 
 class PolkitService {
   public:
-    PolkitService(EventLoop &loop, std::function<void()> on_change);
+    explicit PolkitService(EventLoop &loop);
     ~PolkitService();
     PolkitService(const PolkitService &) = delete;
     PolkitService &operator=(const PolkitService &) = delete;
@@ -22,6 +22,8 @@ class PolkitService {
     bool info_is_error() const;
     void respond(std::string &response);
     void cancel();
+
+    Signal<> changed;
 
   private:
     struct Impl;

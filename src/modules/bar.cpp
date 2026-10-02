@@ -2,6 +2,7 @@
 #include <array>
 #include <cairo-xcb.h>
 #include <chrono>
+#include <cmath>
 #include <malloc.h>
 #include <map>
 #include <numbers>
@@ -13,19 +14,15 @@
 #include "config/bar_config.h"
 
 #include "core/app_fonts.h"
-#include "core/dbus.h"
 #include "core/log.h"
 
 #include "modules/bar.h"
-#include "modules/bar/clock_widget.h"
-#include "modules/bar/logout_widget.h"
-#include "modules/bar/status_widget.h"
-#include "modules/bar/workspace_widget.h"
-
-#include "service/battery_service.h"
-#include "service/bluetooth_service.h"
-#include "service/network_service.h"
-#include "service/workspace_service.h"
+#include "modules/bar/panel/control_center_panel.h"
+#include "modules/bar/widget/clock_widget.h"
+#include "modules/bar/widget/control_center_widget.h"
+#include "modules/bar/widget/logout_widget.h"
+#include "modules/bar/widget/status_widget.h"
+#include "modules/bar/widget/workspace_widget.h"
 
 namespace astralia {
 
@@ -47,11 +44,13 @@ void rounded_rect(cairo_t *cr, double x, double y, double w, double h, double r)
 
 } // namespace
 
-Bar::Bar(XConnection &x, EventLoop &loop, IpcServer &ipc) : x_(x), ipc_(ipc) {
+Bar::Bar(XConnection &x, EventLoop &loop, IpcServer &ipc, Services &services)
+    : x_(x), ipc_(ipc), services_(services) {
     register_app_fonts();
     clock_ = std::make_unique<ClockWidget>();
     logout_ = std::make_unique<LogoutWidget>();
     status_ = std::make_unique<StatusWidget>();
+    control_center_ = std::make_unique<ControlCenterWidget>();
     xcb_connection_t *conn = x_.conn();
     OutputGeometry output = x_.primary_output();
     width_ = output.width;
@@ -89,20 +88,21 @@ Bar::Bar(XConnection &x, EventLoop &loop, IpcServer &ipc) : x_(x), ipc_(ipc) {
     surface_ = cairo_xcb_surface_create(conn, pixmap_, visual, width_, height_);
     cr_ = cairo_create(surface_);
 
-    bus_ = std::make_unique<SystemBus>(loop);
-    workspaces_ = std::make_unique<WorkspaceService>(x_, loop, [this] { draw_all(); });
-    session_ = std::make_unique<SystemBus>(loop, BusKind::session);
-    notifier_ = session_->proxy("org.freedesktop.Notifications", "/org/freedesktop/Notifications");
-    bluetooth_ = std::make_unique<BluetoothService>(
-        *bus_, [this] { redraw_status(); },
+    notifier_ =
+        services_.session.proxy("org.freedesktop.Notifications", "/org/freedesktop/Notifications");
+    services_.i3.changed.connect([this] { draw_all(); });
+    services_.bluetooth.changed.connect([this] { redraw_status(); });
+    services_.bluetooth.messages.connect(
         [this](const StatusMessage &message) { notify("Bluetooth", message); });
-    network_ = std::make_unique<NetworkService>(
-        *bus_, [this] { redraw_status(); },
+    services_.network.changed.connect([this] { redraw_status(); });
+    services_.network.messages.connect(
         [this](const StatusMessage &message) { notify("Network", message); });
-    battery_ = std::make_unique<BatteryService>(*bus_, [this] { redraw_status(); });
+    services_.battery.changed.connect([this] { redraw_status(); });
+    control_center_panel_ = std::make_unique<ControlCenterPanel>(x_, loop, services_);
 
     clock_->refresh();
-    status_->update(bluetooth_->status(), network_->status(), battery_->status());
+    status_->update(services_.bluetooth.status(), services_.network.status(),
+                    services_.battery.status());
     draw_all();
 
     loop.on_window(window_, [this](const xcb_generic_event_t &event) {
@@ -184,6 +184,15 @@ void Bar::paint_panel() {
     cairo_stroke(cr_);
 }
 
+void Bar::draw_divider(const Rect &left, const Rect &right) {
+    double x = (left.x + left.width + right.x) / 2.0;
+    double height = panel_.height * bar_config::divider_height_ratio;
+    set_source(cr_, bar_config::divider);
+    cairo_rectangle(cr_, std::floor(x), panel_.y + (panel_.height - height) / 2.0,
+                    bar_config::divider_width, height);
+    cairo_fill(cr_);
+}
+
 void Bar::draw_all() {
     Rect whole{0, 0, width_, height_};
     cairo_set_operator(cr_, CAIRO_OPERATOR_SOURCE);
@@ -196,10 +205,11 @@ void Bar::draw_all() {
     set_source(cr_, bar_config::foreground);
     logout_rect_ = {panel_.x + bar_config::padding_x, panel_.y, logout_->width(), panel_.height};
     logout_->draw(cr_, logout_rect_.x, panel_.y, panel_.height);
-    const WorkspaceStatus &workspaces = workspaces_->status();
+    const I3Status &workspaces = services_.i3.status();
     workspace_rect_ = {logout_rect_.x + logout_rect_.width + bar_config::group_gap, panel_.y,
                        workspace_row_width(workspaces), panel_.height};
     draw_workspace_row(cr_, workspaces, workspace_rect_.x, panel_.y, panel_.height);
+    draw_divider(logout_rect_, workspace_rect_);
 
     // Center region grows outward from the panel center.
     clock_rect_ = clock_rect();
@@ -207,10 +217,15 @@ void Bar::draw_all() {
 
     // Right region grows leftward from the right edge.
     set_source(cr_, bar_config::foreground);
+    int control_center_width = control_center_->width();
+    control_center_rect_ = {panel_.x + panel_.width - bar_config::padding_x - control_center_width,
+                            panel_.y, control_center_width, panel_.height};
+    control_center_->draw(cr_, control_center_rect_.x, panel_.y, panel_.height);
     int status_width = status_->width();
-    status_rect_ = {panel_.x + panel_.width - bar_config::padding_x - status_width, panel_.y,
+    status_rect_ = {control_center_rect_.x - bar_config::group_gap - status_width, panel_.y,
                     status_width, panel_.height};
     status_->draw(cr_, status_rect_.x, panel_.y, panel_.height);
+    draw_divider(status_rect_, control_center_rect_);
     present(whole);
 }
 
@@ -235,7 +250,8 @@ void Bar::redraw_clock() {
 }
 
 void Bar::redraw_status() {
-    status_->update(bluetooth_->status(), network_->status(), battery_->status());
+    status_->update(services_.bluetooth.status(), services_.network.status(),
+                    services_.battery.status());
     draw_all();
 }
 
@@ -261,9 +277,11 @@ void Bar::click(const xcb_button_press_event_t &event) {
     }
     if (logout_rect_.contains(event.event_x)) {
         ipc_.dispatch("logout");
+    } else if (control_center_rect_.contains(event.event_x)) {
+        control_center_panel_->toggle();
     } else if (workspace_rect_.contains(event.event_x)) {
-        if (auto index = workspace_at(workspaces_->status(), event.event_x - workspace_rect_.x)) {
-            workspaces_->switch_to(*index);
+        if (auto index = workspace_at(services_.i3.status(), event.event_x - workspace_rect_.x)) {
+            services_.i3.switch_to(*index);
         }
     }
 }

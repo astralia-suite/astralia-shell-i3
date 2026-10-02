@@ -1,7 +1,6 @@
 #include <cmath>
 #include <cstdint>
 #include <string>
-#include <utility>
 
 #include "service/battery_service.h"
 
@@ -19,15 +18,14 @@ constexpr uint32_t state_fully_charged = 4;
 
 } // namespace
 
-BatteryService::BatteryService(SystemBus &bus, std::function<void()> on_change)
-    : bus_(bus), on_change_(std::move(on_change)),
-      device_(bus_.proxy(upower_service, display_device)) {
+BatteryService::BatteryService(SystemBus &bus)
+    : bus_(bus), device_(bus_.proxy(upower_service, display_device)) {
     refresh();
     match_ = bus_.add_match("type='signal',sender='org.freedesktop.UPower',"
                             "path='/org/freedesktop/UPower/devices/DisplayDevice'",
                             [this] {
                                 if (refresh()) {
-                                    on_change_();
+                                    changed.emit();
                                 }
                             });
 }

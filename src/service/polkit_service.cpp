@@ -223,7 +223,7 @@ void astralia_polkit_listener_class_init(AstraliaPolkitListenerClass *klass) {
 } // namespace
 
 struct PolkitService::Impl {
-    std::function<void()> on_change;
+    Signal<> &changed_signal;
     AstraliaPolkitListener *listener = nullptr;
     PolkitAgentSession *session = nullptr;
     GMainContext *context = g_main_context_default();
@@ -236,7 +236,7 @@ struct PolkitService::Impl {
     std::vector<GPollFD> poll_fds;
     gint max_priority = G_PRIORITY_DEFAULT;
 
-    explicit Impl(std::function<void()> callback) : on_change(std::move(callback)) {
+    explicit Impl(Signal<> &signal) : changed_signal(signal) {
         listener = static_cast<AstraliaPolkitListener *>(
             g_object_new(astralia_polkit_listener_get_type(), nullptr));
         listener->owner = this;
@@ -358,11 +358,7 @@ struct PolkitService::Impl {
         guard_callback("show_info", [&] { static_cast<Impl *>(user_data)->set_info(text, false); });
     }
 
-    void changed() {
-        if (on_change) {
-            on_change();
-        }
-    }
+    void changed() { changed_signal.emit(); }
 
     void set_info(const gchar *text, bool error) {
         info = text != nullptr ? text : "";
@@ -546,8 +542,8 @@ struct PolkitService::Impl {
     }
 };
 
-PolkitService::PolkitService(EventLoop &loop, std::function<void()> on_change)
-    : loop_(loop), impl_(std::make_unique<Impl>(std::move(on_change))) {
+PolkitService::PolkitService(EventLoop &loop)
+    : loop_(loop), impl_(std::make_unique<Impl>(changed)) {
     source_ = loop_.add_poll_source([this](std::vector<pollfd> &fds) { return impl_->prepare(fds); },
                                     [this](std::span<const pollfd> fds) { impl_->dispatch(fds); });
     impl_->start();

@@ -25,6 +25,23 @@ inline constexpr int pill_width = 10;
 inline constexpr int pill_active_width = 26;
 inline constexpr int pill_spacing = 6;
 
+// Dividers
+inline constexpr double divider_height_ratio = 0.4;
+inline constexpr double divider_width = 1.0;
+inline constexpr Color divider = palette::text_alpha20;
+
+// Control center
+inline constexpr int control_center_width = 320;
+inline constexpr int control_center_padding = 16;
+inline constexpr int control_center_row_height = 40;
+inline constexpr int control_center_track_height = 6;
+inline constexpr int control_center_icon_slot = 28;
+inline constexpr int control_center_gap = 12;
+inline constexpr int control_center_wheel_step = 5;
+inline constexpr const char *control_center_percent_sample = "100%";
+inline constexpr Color control_center_track = palette::text_alpha20;
+inline constexpr Color control_center_fill = palette::accent;
+
 // Typography
 inline constexpr const char *font = "Comic Shanns Mono 15";
 inline constexpr const char *icon_font = "tabler-icons 17";

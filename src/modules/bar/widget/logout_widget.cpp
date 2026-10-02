@@ -2,7 +2,7 @@
 
 #include "core/icons.h"
 
-#include "modules/bar/logout_widget.h"
+#include "modules/bar/widget/logout_widget.h"
 
 namespace astralia {
 

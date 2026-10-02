@@ -92,4 +92,18 @@ inline constexpr const char *wifi1 = "\ueba4";
 inline constexpr const char *wifi2 = "\ueba5";
 inline constexpr const char *wifi_off = "\uecfa";
 
+inline const char *volume_threshold(bool muted, int percent) {
+    if (muted) {
+        return volume_mute;
+    }
+    if (percent < 1) {
+        return volume_empty;
+    }
+    return percent < 50 ? volume_low : volume_high;
+}
+
+inline const char *brightness_threshold(int percent) {
+    return percent < 50 ? brightness_down : brightness_up;
+}
+
 } // namespace astralia::icon

@@ -14,11 +14,13 @@ class Text {
 
     bool set(std::string_view text);
     void wrap(int width);
+    void ellipsize(int width);
     int width() const;
     int height() const;
     void draw(cairo_t *cr, double x, double y) const;
     void draw_centered(cairo_t *cr, double x, int top, int height) const;
     void draw_ink_centered(cairo_t *cr, double cx, double cy) const;
+    void draw_ink_left(cairo_t *cr, double x, double cy) const;
 
   private:
     struct Unref {

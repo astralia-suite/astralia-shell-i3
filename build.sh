@@ -12,7 +12,7 @@ set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
 
 cmd_setup() {
-    sudo pacman -S --needed meson ninja gcc clang pkgconf libx11 libxcb xcb-util-wm xcb-util-keysyms cairo pango fontconfig resvg stb sdbus-cpp bluez networkmanager upower libxkbcommon-x11 polkit fd
+    sudo pacman -S --needed meson ninja gcc clang pkgconf libxcb xcb-util-wm xcb-util-keysyms cairo pango fontconfig resvg stb sdbus-cpp libxkbcommon libxkbcommon-x11 polkit libpipewire pipewire wireplumber bluez networkmanager upower fd brightnessctl
 }
 
 cmd_build() {

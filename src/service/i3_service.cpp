@@ -9,19 +9,17 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
-#include <utility>
 #include <xcb/xcb_ewmh.h>
 
 #include "config/bar_config.h"
 
 #include "core/log.h"
 
-#include "service/workspace_service.h"
+#include "service/i3_service.h"
 
 namespace astralia {
 
-WorkspaceService::WorkspaceService(XConnection &x, EventLoop &loop, std::function<void()> on_change)
-    : x_(x), on_change_(std::move(on_change)) {
+I3Service::I3Service(XConnection &x, EventLoop &loop) : x_(x) {
     uint32_t mask = XCB_EVENT_MASK_PROPERTY_CHANGE;
     xcb_change_window_attributes(x_.conn(), x_.root(), XCB_CW_EVENT_MASK, &mask);
     refresh();
@@ -33,19 +31,19 @@ WorkspaceService::WorkspaceService(XConnection &x, EventLoop &loop, std::functio
             return;
         }
         if (refresh()) {
-            on_change_();
+            changed.emit();
         }
     });
 }
 
-void WorkspaceService::switch_to(uint32_t index) {
+void I3Service::switch_to(uint32_t index) {
     if (index >= status_.count || index == status_.current) {
         return;
     }
     i3_command(std::format("workspace number {}", index + 1));
 }
 
-std::string WorkspaceService::i3_socket_path() {
+std::string I3Service::i3_socket_path() {
     if (const char *env = std::getenv("I3_SOCK")) {
         return env;
     }
@@ -60,7 +58,7 @@ std::string WorkspaceService::i3_socket_path() {
             static_cast<std::size_t>(xcb_get_property_value_length(reply.get()))};
 }
 
-void WorkspaceService::i3_command(std::string_view command) {
+void I3Service::i3_command(std::string_view command) {
     std::string path = i3_socket_path();
     sockaddr_un addr{};
     addr.sun_family = AF_UNIX;
@@ -87,11 +85,11 @@ void WorkspaceService::i3_command(std::string_view command) {
     close(fd);
 }
 
-bool WorkspaceService::refresh() {
+bool I3Service::refresh() {
     xcb_ewmh_connection_t *ewmh = x_.ewmh();
     auto names_cookie = xcb_ewmh_get_desktop_names(ewmh, 0);
     auto current_cookie = xcb_ewmh_get_current_desktop(ewmh, 0);
-    WorkspaceStatus next{bar_config::workspace_count, bar_config::workspace_count};
+    I3Status next{bar_config::workspace_count, bar_config::workspace_count};
     uint32_t desktop = 0;
     bool has_desktop =
         xcb_ewmh_get_current_desktop_reply(ewmh, current_cookie, &desktop, nullptr) != 0;

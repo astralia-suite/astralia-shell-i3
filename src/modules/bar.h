@@ -8,25 +8,23 @@
 #include <string>
 #include <xcb/xcb.h>
 
+#include "app/services.h"
+
 #include "core/event_loop.h"
 #include "core/ipc.h"
 #include "core/x_connection.h"
 
 namespace astralia {
 
-class BatteryService;
-class BluetoothService;
 class ClockWidget;
+class ControlCenterPanel;
+class ControlCenterWidget;
 class LogoutWidget;
-class NetworkService;
 class StatusWidget;
-struct StatusMessage;
-class SystemBus;
-class WorkspaceService;
 
 class Bar {
   public:
-    Bar(XConnection &x, EventLoop &loop, IpcServer &ipc);
+    Bar(XConnection &x, EventLoop &loop, IpcServer &ipc, Services &services);
     ~Bar();
     Bar(const Bar &) = delete;
     Bar &operator=(const Bar &) = delete;
@@ -44,6 +42,7 @@ class Bar {
     void set_hints(const OutputGeometry &output);
     void paint_background(const Rect &rect);
     void paint_panel();
+    void draw_divider(const Rect &left, const Rect &right);
     void draw_all();
     void draw_clock();
     void redraw_clock();
@@ -56,6 +55,7 @@ class Bar {
 
     XConnection &x_;
     IpcServer &ipc_;
+    Services &services_;
     uint16_t width_;
     uint16_t height_;
     Rect panel_{};
@@ -65,20 +65,17 @@ class Bar {
     xcb_gcontext_t gc_;
     cairo_surface_t *surface_;
     cairo_t *cr_;
-    std::unique_ptr<SystemBus> bus_;
-    std::unique_ptr<SystemBus> session_;
     std::unique_ptr<sdbus::IProxy> notifier_;
-    std::unique_ptr<WorkspaceService> workspaces_;
-    std::unique_ptr<BluetoothService> bluetooth_;
-    std::unique_ptr<NetworkService> network_;
-    std::unique_ptr<BatteryService> battery_;
     std::unique_ptr<ClockWidget> clock_;
     std::unique_ptr<LogoutWidget> logout_;
     std::unique_ptr<StatusWidget> status_;
+    std::unique_ptr<ControlCenterWidget> control_center_;
+    std::unique_ptr<ControlCenterPanel> control_center_panel_;
     Rect clock_rect_{};
     Rect logout_rect_{};
     Rect workspace_rect_{};
     Rect status_rect_{};
+    Rect control_center_rect_{};
 };
 
 } // namespace astralia

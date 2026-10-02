@@ -47,9 +47,10 @@ void panel(cairo_t *cr, double x, double y, double w, double h, const Color &bor
 
 } // namespace
 
-Notifications::Notifications(XConnection &x, EventLoop &loop)
+Notifications::Notifications(XConnection &x, EventLoop &loop, Services &services)
     : x_(x), app_(cfg::app_font), summary_(cfg::summary_font), body_(cfg::body_font),
-      service_(loop, [this] { sync(); }) {
+      service_(services.notifications) {
+    service_.changed.connect([this] { sync(); });
     app_.wrap(cfg::wrap_width);
     summary_.wrap(cfg::wrap_width);
     body_.wrap(cfg::wrap_width);

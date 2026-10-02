@@ -68,10 +68,11 @@ SurfacePtr load_echo() {
 
 } // namespace
 
-Polkit::Polkit(XConnection &x, EventLoop &loop)
+Polkit::Polkit(XConnection &x, EventLoop &loop, Services &services)
     : x_(x), keyboard_(x.conn()), title_(cfg::title_font), message_(cfg::message_font),
       field_(cfg::field_font), info_(cfg::info_font), echo_(load_echo()),
-      service_(loop, [this] { sync(); }) {
+      service_(services.polkit) {
+    service_.changed.connect([this] { sync(); });
     xcb_connection_t *conn = x_.conn();
     visual_ = x_.argb_visual();
     depth_ = 32;

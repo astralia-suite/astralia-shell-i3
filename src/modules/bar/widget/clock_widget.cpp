@@ -4,7 +4,7 @@
 
 #include "config/bar_config.h"
 
-#include "modules/bar/clock_widget.h"
+#include "modules/bar/widget/clock_widget.h"
 
 namespace astralia {
 

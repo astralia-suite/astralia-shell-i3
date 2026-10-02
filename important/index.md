@@ -12,7 +12,7 @@
 
 - `meson.build`: Builds `astralia-core` static library, `astralia-shell` executable and `astralia-shell-test` unit test; installs fonts and assets.
 - `meson.options`: `native_cpu` option adding `-march=westmere` for the ThinkPad X201.
-- `build.sh`: Build, `setup` dependencies (including `polkit`), `test`, `install` to `/usr/bin`, or `run` (kill, install, start `astralia-shell`).
+- `build.sh`: Build, `setup` dependencies (build libraries plus `pipewire`, `wireplumber`, `bluez`, `networkmanager`, `upower`, `fd`, `brightnessctl`), `test`, `install` to `/usr/bin`, or `run` (kill, install, start `astralia-shell`).
 - `.clang-format`: Project code style (LLVM base, 4-space indent, no column limit, preserved include blocks).
 
 ## `assets/fonts/`
@@ -35,7 +35,11 @@
 
 ## `src/`
 
-- `main.cpp`: Parses the mode; runs the IPC client, or locks, daemonizes, creates X, loop, IPC server, wallpaper, bar, launcher, logout, polkit and notifications.
+- `main.cpp`: Parses the mode; runs the IPC client, or locks, daemonizes, creates X, loop, IPC server, shared `Services`, then wallpaper, bar, launcher, logout, polkit, notifications and OSD.
+
+## `src/app/`
+
+- `services.{h,cpp}`: `Services` owns every shared service (buses, i3, network, Bluetooth, battery, brightness, notifications, polkit, audio); modules take it by reference.
 
 ## `src/core/`
 
@@ -48,39 +52,47 @@
 - `log.{h,cpp}`: `log::info` and `log::error` formatted messages to stderr.
 - `x_connection.{h,cpp}`: RAII xcb connection (syncs before disconnect, cairo MIT-SHM disabled) with screen, root and ARGB visuals, EWMH, atoms, RandR outputs.
 - `event_loop.{h,cpp}`: `poll()` loop over X, `signalfd`, a `CLOCK_BOOTTIME` `timerfd`, extra fds and prepare/dispatch poll sources; window and event-type handlers, timers with `reschedule()`, `stop()`.
-- `text.{h,cpp}`: Cached `PangoLayout` with a fixed font; set text, optional word wrap, measure pixel size, draw (vertically or ink centered) on cairo.
+- `text.{h,cpp}`: Cached `PangoLayout` with a fixed font; set text, optional word wrap or end ellipsis, measure pixel size, draw (vertically centered, ink centered or ink left-aligned and vertically centered) on cairo.
 - `keyboard.{h,cpp}`: xkbcommon-x11 keymap; translates key presses, with modifiers from the event, to text, backspace, arrows, enter, escape.
 - `spawn.{h,cpp}`: `spawn_detached()`: double-forked `sh -c` with an empty signal mask and default `SIGPIPE`.
+- `signal.h`: `Signal<Args...>` subscriber list; services expose it, modules `connect()`, services `emit()`.
 - `palette.h`: `Color`, `constexpr` `color("#hex")` parser, shared `palette::` colors and `metrics::` radii/borders.
-- `icons.h`: `icon::` Tabler glyph codepoints as UTF-8 strings.
+- `icons.h`: `icon::` Tabler glyph codepoints as UTF-8 strings; `volume_threshold()` and `brightness_threshold()` level icons, as in `hl`.
 - `app_fonts.{h,cpp}`: Idempotent `register_app_fonts()` adds the icon, text and Yuji Mai fonts to fontconfig from the install or source dir.
 - `image_decode.{h,cpp}`: `SurfacePtr` and `decode_image()`: `stb_image` rasters or `resvg` SVGs into premultiplied cairo surfaces, optionally fit to a size.
 - `dbus.{h,cpp}`: `SystemBus` sdbus-c++ system or session (`BusKind`) connection driven by `EventLoop` fds, `add_match()`, `proxy()`, and `dbus_property<T>()` via proxy or path.
 
 ## `src/config/`
 
-- `bar_config.h`: Bar geometry, corner radius, padding, border, pill sizes, fonts, colors, `strftime` clock format and `malloc_trim` interval.
+- `bar_config.h`: Bar geometry, corner radius, padding, border, pill sizes, divider and control center sizes, fonts, colors, `strftime` clock format and `malloc_trim` interval.
 - `logout_config.h`: Logout button ring geometry, Yuji Mai glyph font, colors, logo file and the 8-entry glyph/command action table.
 - `launcher_config.h`: Launcher geometry, fonts, colors, launch commands, search limits, and result, submenu and visit plain types.
 - `polkit_config.h`: Polkit card geometry, line heights, fonts, colors, prompt texts and echo glyph file.
 - `notification_config.h`: Notification stack margins, spacing, 480 px stack cap, 400 px card geometry, wrap width, close x size, app/title/body fonts, colors and the fixed 5 s `hang_time`.
+- `osd_config.h`: OSD pill geometry from `hl` widened to 300×50 so content clears the round ends (30 px bottom margin), fonts, colors, 2 s visibility and 1 s startup delay.
 - `wallpaper_config.h`: Wallpaper config file path under the config dir, `*` wildcard output key, fallback color.
 
 ## `src/modules/`
 
-- `bar.{h,cpp}`: Top dock with inset pill-shaped panel, EWMH hints and strut; owns services; logout and workspaces left, clock center, status right; logout click dispatches `logout` IPC; sends status-change `Notify` on the session bus; periodic `malloc_trim`.
+- `bar.{h,cpp}`: Top dock with inset pill-shaped panel, EWMH hints and strut; subscribes to shared i3, network, Bluetooth and battery services; logout and workspaces left, clock center, status and control center right, 1 px dividers between widget groups; logout click dispatches `logout` IPC, control center click toggles its panel; sends status-change `Notify` on the session bus; periodic `malloc_trim`.
 - `launcher.{h,cpp}`: `launcher` / `launcher global` IPC toggle; override-redirect overlay on the pointer's output; takes input focus, closes on focus loss; `malloc_trim` on close.
 - `logout.{h,cpp}`: `logout` IPC toggle; override-redirect overlay on the pointer's output with 8 glyph buttons around the logo; keys, hover, click run actions.
-- `notification.{h,cpp}`: Owns `NotificationService`; unfocusable override-redirect card stack at the pointer output's bottom right; top-right x dismisses a card.
-- `polkit.{h,cpp}`: Owns `PolkitService`; override-redirect card on the pointer's output while a request is pending; masked password, `Enter` submits, `Escape` cancels.
+- `notification.{h,cpp}`: Subscribes to the shared `NotificationService`; unfocusable override-redirect card stack at the pointer output's bottom right; top-right x dismisses a card.
+- `polkit.{h,cpp}`: Subscribes to the shared `PolkitService`; override-redirect card on the pointer's output while a request is pending; masked password, `Enter` submits, `Escape` cancels.
+- `osd.{h,cpp}`: Unfocusable, click-through (empty `SHAPE` input region) override-redirect pill at the pointer output's bottom center; shows brightness, volume or mic level on service changes, hides after 2 s.
 - `wallpaper.{h,cpp}`: Per-output root pixmap from `wallpaper.conf` via `_XROOTPMAP_ID`, cleared on exit; repaints on RandR or `inotify` changes, then `malloc_trim`.
 
-## `src/modules/bar/`
+## `src/modules/bar/widget/`
 
+- `control_center_widget.{h,cpp}`: `icon::adjustments` button at the bar's right end.
 - `clock_widget.{h,cpp}`: Local date and time text (`Mon 1970-01-01 00:00:00`) and `ms_until_next_second()` for per-second redraws.
 - `logout_widget.{h,cpp}`: `icon::power` button with a `Logout` label shown only while hovered.
 - `workspace_widget.{h,cpp}`: Pill row (active wider, accent), `workspace_row_width()` and click hit-test `workspace_at()`.
 - `status_widget.{h,cpp}`: Bluetooth, network and battery icons; device, `Idle` or `Disabled`, SSID, percent or `Plugged in` label shown only while hovered; pure selection functions.
+
+## `src/modules/bar/panel/`
+
+- `control_center_panel.{h,cpp}`: Override-redirect card under the bar's right end; brightness and volume sliders (click, drag, wheel) following live service changes, `Escape` or focus loss closes; `slider_percent_at()`.
 
 ## `src/modules/launcher/`
 
@@ -113,13 +125,15 @@
 
 ## `src/service/`
 
-- `workspace_service.{h,cpp}`: EWMH desktop count and current desktop from root property events; `switch_to()` via client message.
+- `i3_service.{h,cpp}`: i3 workspace numbers, occupied and current from EWMH root property events; `switch_to()` via the i3 IPC socket.
 - `bluetooth_service.{h,cpp}`: BlueZ `GetManagedObjects` on a held root proxy: adapter present, powered, first connected device alias; refreshes on `org.bluez` signals; `bluetooth_changes()` connect/disconnect messages.
 - `network_service.{h,cpp}`: NetworkManager type, captive portal, Wi-Fi strength and SSID via a held manager proxy; refreshes on `PropertiesChanged`; `network_changes()` connect/disconnect/portal messages.
 - `polkit_service.{h,cpp}`: Polkit authentication agent on the session; drives the default `GMainContext` via an `EventLoop` poll source; request, response and info state.
 - `notification_service.{h,cpp}`: `org.freedesktop.Notifications` server on the session bus; FIFO list expiring each entry after `hang_time`.
+- `brightness_service.{h,cpp}`: First `/sys/class/backlight` device percent, `inotify` change signal; `set()` via `brightnessctl`.
+- `audio_service.{h,cpp}`: `libpipewire` default sink/source level and mute on the `EventLoop`; route-or-node `set_sink_volume()`; pure `audio_percent()`.
 - `battery_service.{h,cpp}`: UPower `DisplayDevice` presence, percent, charging and full state via a held proxy; refreshes on its signals.
 
 ## `test/`
 
-- `main.cpp`: Plain check runner for `astralia-shell-test`; covers clock timing, CLI, runtime paths, help, `color()`, status icons, workspace row, wallpaper cover and config, launcher search, parsing, URLs, ranking, submenus, logout, polkit and notification layout, network and Bluetooth change messages.
+- `main.cpp`: Plain check runner for `astralia-shell-test`; covers clock timing, CLI, runtime paths, help, `color()`, status icons, workspace row, wallpaper cover and config, launcher search, parsing, URLs, ranking, submenus, logout, polkit and notification layout, network and Bluetooth change messages, `audio_percent()` and slider percent.

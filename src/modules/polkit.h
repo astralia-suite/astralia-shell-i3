@@ -4,6 +4,8 @@
 #include <string>
 #include <xcb/xcb.h>
 
+#include "app/services.h"
+
 #include "core/app_fonts.h"
 #include "core/event_loop.h"
 #include "core/image_decode.h"
@@ -11,13 +13,11 @@
 #include "core/text.h"
 #include "core/x_connection.h"
 
-#include "service/polkit_service.h"
-
 namespace astralia {
 
 class Polkit {
   public:
-    Polkit(XConnection &x, EventLoop &loop);
+    Polkit(XConnection &x, EventLoop &loop, Services &services);
     ~Polkit();
     Polkit(const Polkit &) = delete;
     Polkit &operator=(const Polkit &) = delete;
@@ -58,7 +58,7 @@ class Polkit {
     bool error_shown_ = false;
     bool last_error_ = false;
     bool open_ = false;
-    PolkitService service_;
+    PolkitService &service_;
 };
 
 } // namespace astralia

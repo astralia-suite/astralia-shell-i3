@@ -27,6 +27,11 @@ void Text::wrap(int width) {
     pango_layout_set_wrap(layout_.get(), PANGO_WRAP_WORD_CHAR);
 }
 
+void Text::ellipsize(int width) {
+    pango_layout_set_width(layout_.get(), width * PANGO_SCALE);
+    pango_layout_set_ellipsize(layout_.get(), PANGO_ELLIPSIZE_END);
+}
+
 int Text::width() const {
     int width = 0;
     pango_layout_get_pixel_size(layout_.get(), &width, nullptr);
@@ -52,6 +57,12 @@ void Text::draw_ink_centered(cairo_t *cr, double cx, double cy) const {
     PangoRectangle ink{};
     pango_layout_get_pixel_extents(layout_.get(), &ink, nullptr);
     draw(cr, cx - ink.x - ink.width / 2.0, cy - ink.y - ink.height / 2.0);
+}
+
+void Text::draw_ink_left(cairo_t *cr, double x, double cy) const {
+    PangoRectangle ink{};
+    pango_layout_get_pixel_extents(layout_.get(), &ink, nullptr);
+    draw(cr, x - ink.x, cy - ink.y - ink.height / 2.0);
 }
 
 } // namespace astralia

@@ -2,13 +2,13 @@
 
 #include "config/bar_config.h"
 
-#include "modules/bar/workspace_widget.h"
+#include "modules/bar/widget/workspace_widget.h"
 
 namespace astralia {
 
 namespace {
 
-int pill_width(const WorkspaceStatus &status, uint32_t index) {
+int pill_width(const I3Status &status, uint32_t index) {
     return index == status.current ? bar_config::pill_active_width : bar_config::pill_width;
 }
 
@@ -24,7 +24,7 @@ void fill_pill(cairo_t *cr, double x, double y, double width, double height) {
 
 } // namespace
 
-int workspace_row_width(const WorkspaceStatus &status) {
+int workspace_row_width(const I3Status &status) {
     int width = 0;
     for (uint32_t i = 0; i < status.count; ++i) {
         width += pill_width(status, i) + (i > 0 ? bar_config::pill_spacing : 0);
@@ -32,7 +32,7 @@ int workspace_row_width(const WorkspaceStatus &status) {
     return width;
 }
 
-std::optional<uint32_t> workspace_at(const WorkspaceStatus &status, int offset) {
+std::optional<uint32_t> workspace_at(const I3Status &status, int offset) {
     int start = 0;
     for (uint32_t i = 0; i < status.count; ++i) {
         int end = start + pill_width(status, i) + bar_config::pill_spacing;
@@ -45,7 +45,7 @@ std::optional<uint32_t> workspace_at(const WorkspaceStatus &status, int offset) 
     return std::nullopt;
 }
 
-void draw_workspace_row(cairo_t *cr, const WorkspaceStatus &status, double x, int top, int height) {
+void draw_workspace_row(cairo_t *cr, const I3Status &status, double x, int top, int height) {
     double y = top + (height - bar_config::pill_height) / 2.0;
     for (uint32_t i = 0; i < status.count; ++i) {
         const Color &color = i == status.current           ? bar_config::pill_active

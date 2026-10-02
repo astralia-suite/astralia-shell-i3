@@ -1,10 +1,10 @@
 #pragma once
 
-#include <functional>
 #include <memory>
 #include <sdbus-c++/sdbus-c++.h>
 
 #include "core/dbus.h"
+#include "core/signal.h"
 
 namespace astralia {
 
@@ -19,15 +19,16 @@ struct BatteryStatus {
 
 class BatteryService {
   public:
-    BatteryService(SystemBus &bus, std::function<void()> on_change);
+    explicit BatteryService(SystemBus &bus);
 
     const BatteryStatus &status() const { return status_; }
+
+    Signal<> changed;
 
   private:
     bool refresh();
 
     SystemBus &bus_;
-    std::function<void()> on_change_;
     BatteryStatus status_;
     std::unique_ptr<sdbus::IProxy> device_;
     sdbus::Slot match_;
