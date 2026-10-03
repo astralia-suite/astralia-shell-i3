@@ -38,6 +38,7 @@
 #include "render/icons.h"
 #include "render/palette.h"
 #include "render/panel_chrome.h"
+#include "render/slider.h"
 
 #include "service/audio_service.h"
 #include "service/bluetooth_service.h"

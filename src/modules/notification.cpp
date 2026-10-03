@@ -16,7 +16,7 @@ namespace cfg = notification_config;
 
 void panel(cairo_t *cr, double x, double y, double w, double h, const Color &border) {
     rounded_rect(cr, x, y, w, h, cfg::card_radius);
-    set_source(cr, cfg::background);
+    set_source(cr, palette::overlay);
     cairo_fill(cr);
     double inset = cfg::border_width / 2.0;
     rounded_rect(cr, x + inset, y + inset, w - cfg::border_width, h - cfg::border_width,
@@ -98,10 +98,10 @@ void Notifications::paint() {
     for (std::size_t i = 0; i < shown_.size(); ++i) {
         const Notification &n = shown_[i];
         panel(cr, 0.0, y, cfg::card_width, heights_[i],
-              n.critical ? cfg::critical_border : cfg::border);
+              n.critical ? palette::critical : palette::accent);
         double close_x = cfg::card_width - cfg::card_pad - cfg::close_size;
         double close_y = y + cfg::card_pad;
-        set_source(cr, cfg::close);
+        set_source(cr, palette::text_muted);
         cairo_set_line_width(cr, cfg::close_line_width);
         cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
         cairo_move_to(cr, close_x, close_y);
@@ -110,20 +110,20 @@ void Notifications::paint() {
         cairo_line_to(cr, close_x, close_y + cfg::close_size);
         cairo_stroke(cr);
         double line_y = y + cfg::card_pad;
-        set_source(cr, cfg::app);
+        set_source(cr, palette::accent);
         app_.set(n.app.empty() ? cfg::app_fallback : n.app);
         app_.draw(cr, cfg::card_pad, line_y);
         line_y += app_.height();
         if (!n.summary.empty()) {
             line_y += cfg::content_spacing;
-            set_source(cr, cfg::summary);
+            set_source(cr, palette::text);
             summary_.set(n.summary);
             summary_.draw(cr, cfg::card_pad, line_y);
             line_y += summary_.height();
         }
         if (!n.body.empty()) {
             line_y += cfg::content_spacing;
-            set_source(cr, cfg::body);
+            set_source(cr, palette::text_muted);
             body_.set(n.body);
             body_.draw(cr, cfg::card_pad, line_y);
         }

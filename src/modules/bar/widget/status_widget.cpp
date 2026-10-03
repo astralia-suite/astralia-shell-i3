@@ -107,7 +107,7 @@ std::optional<StatusItem> StatusWidget::item_at(int offset) const {
         if (!items_[i].visible) {
             continue;
         }
-        int end = start + items_[i].width(i == hovered_) + bar_config::item_gap;
+        int end = start + items_[i].width(expanded(i)) + bar_config::item_gap;
         if (offset >= start - bar_config::item_gap / 2 && offset < end - bar_config::item_gap / 2) {
             return static_cast<StatusItem>(i);
         }
@@ -129,11 +129,25 @@ bool StatusWidget::hover(std::optional<int> offset) {
     return true;
 }
 
+bool StatusWidget::pin(std::optional<StatusItem> item) {
+    std::optional<std::size_t> next;
+    if (item) {
+        next = static_cast<std::size_t>(*item);
+    }
+    if (next == pinned_) {
+        return false;
+    }
+    pinned_ = next;
+    return true;
+}
+
+bool StatusWidget::expanded(std::size_t i) const { return pinned_ ? i == pinned_ : i == hovered_; }
+
 int StatusWidget::width() const {
     int width = 0;
     for (std::size_t i = 0; i < items_.size(); ++i) {
         if (items_[i].visible) {
-            width += (width > 0 ? bar_config::item_gap : 0) + items_[i].width(i == hovered_);
+            width += (width > 0 ? bar_config::item_gap : 0) + items_[i].width(expanded(i));
         }
     }
     return width;
@@ -146,11 +160,11 @@ void StatusWidget::draw(cairo_t *cr, double x, int top, int height) const {
             continue;
         }
         item.icon.draw_centered(cr, x, top, height);
-        if (i == hovered_ && item.label.width() > 0) {
+        if (expanded(i) && item.label.width() > 0) {
             item.label.draw_centered(cr, x + item.icon.width() + bar_config::label_gap, top,
                                      height);
         }
-        x += item.width(i == hovered_) + bar_config::item_gap;
+        x += item.width(expanded(i)) + bar_config::item_gap;
     }
 }
 

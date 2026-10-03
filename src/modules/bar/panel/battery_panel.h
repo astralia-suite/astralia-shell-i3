@@ -22,6 +22,7 @@ class BatteryPanel {
     BatteryPanel(XConnection &x, EventLoop &loop, BatteryService &battery);
 
     void toggle();
+    PanelWindow &window() { return window_; }
 
   private:
     enum Action { close_panel = 1 };

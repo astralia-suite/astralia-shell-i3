@@ -38,15 +38,6 @@ inline constexpr const char *small_font = "Comic Shanns Mono 9";
 inline constexpr const char *icon_font = "tabler-icons 18px";
 inline constexpr std::size_t max_row_chars = 74;
 
-// Colors
-inline constexpr Color background = palette::base_alpha80;
-inline constexpr Color border = palette::accent;
-inline constexpr Color foreground = palette::text;
-inline constexpr Color subtitle = palette::text_alpha65;
-inline constexpr Color row_background = palette::text_alpha03;
-inline constexpr Color hover = palette::accent;
-inline constexpr Color selection = palette::accent_alt_alpha50;
-
 // Bullets
 inline constexpr const char *bullet_prefix = "C";
 inline constexpr const char *bullet_suffix = ".png";

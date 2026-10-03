@@ -20,6 +20,7 @@ class AudioPanel {
     AudioPanel(XConnection &x, EventLoop &loop, AudioService &audio);
 
     void toggle();
+    PanelWindow &window() { return window_; }
 
   private:
     enum Action { close_panel = 1,
@@ -33,6 +34,7 @@ class AudioPanel {
     };
 
     void handle(const xcb_generic_event_t &event);
+    void hover(uint32_t id);
     void press(int x, int y, xcb_button_t button);
     void step(uint32_t id, int delta);
     void set_percent(uint32_t id, int percent);
@@ -43,6 +45,7 @@ class AudioPanel {
     std::vector<PanelHit> hits_;
     std::optional<Drag> dragging_;
     uint32_t selected_ = 0;
+    uint32_t hovered_ = 0;
     int scroll_ = 0;
     int content_height_ = 0;
     int visible_height_ = 0;

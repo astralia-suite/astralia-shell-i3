@@ -60,18 +60,17 @@
 
 ## `src/config/`
 
-- `bar_config.h`: Bar geometry, corner radius, padding, border, pill sizes, divider and control center sizes, status panel placement and bar-only panel values (volume step, password minimum, `electro.png` echo), fonts, colors, `strftime` clock format and `malloc_trim` interval.
-- `panel_config.h`: `render/` panel chrome geometry, fonts and colors shared by every panel.
-- `logout_config.h`: Logout button ring geometry, Yuji Mai glyph font, colors, logo file and the 8-entry glyph/command action table.
-- `launcher_config.h`: Launcher geometry, fonts, colors, launch commands, search limits, and result, submenu and visit plain types.
-- `polkit_config.h`: Polkit card geometry, line heights, fonts, colors, prompt texts and echo glyph file.
-- `notification_config.h`: Notification stack margins, spacing, 480 px stack cap, 400 px card geometry, wrap width, close x size, app/title/body fonts, colors and the fixed 5 s `hang_time`.
-- `osd_config.h`: OSD pill geometry from `hl` widened to 300×50 so content clears the round ends (30 px bottom margin), fonts, colors, 2 s visibility and 1 s startup delay.
-- `wallpaper_config.h`: Wallpaper config file path under the config dir, `*` wildcard output key, fallback color.
+- `bar_config.h`: Bar geometry, corner radius, padding, border, pill sizes, divider and control center sizes, panel size, row/section/slider/empty heights, scroll step, placement and bar-only panel values (volume step, password minimum, `electro.png` echo), fonts, `strftime` clock format, 50 ms panel-close linger and `malloc_trim` interval.
+- `logout_config.h`: Logout button ring geometry, Yuji Mai glyph font, logo file and the 8-entry glyph/command action table.
+- `launcher_config.h`: Launcher geometry, fonts, launch commands, search limits, and result, submenu and visit plain types.
+- `polkit_config.h`: Polkit card geometry, line heights, fonts, prompt texts and echo glyph file.
+- `notification_config.h`: Notification stack margins, spacing, 480 px stack cap, 400 px card geometry, wrap width, close x size, app/title/body fonts and the fixed 5 s `hang_time`.
+- `osd_config.h`: OSD pill geometry from `hl` widened to 300×50 so content clears the round ends (30 px bottom margin), fonts, 2 s visibility and 1 s startup delay.
+- `wallpaper_config.h`: Wallpaper config file path under the config dir, `*` wildcard output key.
 
 ## `src/modules/`
 
-- `bar.{h,cpp}`: Top dock with inset pill-shaped panel, EWMH hints and strut; subscribes to shared i3, network, Bluetooth and battery services; logout and workspaces left, clock center, status and control center right, 1 px dividers between widget groups; logout click dispatches `logout` IPC, control center click toggles its panel, Bluetooth, network, volume and battery status items toggle their panels; sends status-change `Notify` on the session bus; periodic `malloc_trim`.
+- `bar.{h,cpp}`: Top dock with inset pill-shaped panel, EWMH hints and strut; subscribes to shared i3, network, Bluetooth and battery services; logout and workspaces left, clock center, status and control center right, 1 px dividers between widget groups; logout click dispatches `logout` IPC, control center click toggles its panel, Bluetooth, network, volume and battery status items toggle their panels; opening a panel or clicking elsewhere on the bar closes the others, a status item stays expanded while its panel is open and lingers 50 ms after close before re-checking the pointer; sends status-change `Notify` on the session bus; periodic `malloc_trim`.
 - `launcher.{h,cpp}`: `launcher` / `launcher global` IPC toggle; override-redirect overlay on the pointer's output; takes input focus, closes on focus loss; `malloc_trim` on close.
 - `logout.{h,cpp}`: `logout` IPC toggle; override-redirect overlay on the pointer's output with 8 glyph buttons around the logo; keys, hover, click run actions.
 - `notification.{h,cpp}`: Subscribes to the shared `NotificationService`; unfocusable override-redirect card stack at the pointer output's bottom right; top-right x dismisses a card.
@@ -85,7 +84,7 @@
 - `clock_widget.{h,cpp}`: Local date and time text (`Mon 1970-01-01 00:00:00`) and `ms_until_next_second()` for per-second redraws.
 - `logout_widget.{h,cpp}`: `icon::power` button with a `Logout` label shown only while hovered.
 - `workspace_widget.{h,cpp}`: Pill row (active wider, accent), `workspace_row_width()` and click hit-test `workspace_at()`.
-- `status_widget.{h,cpp}`: Bluetooth, network, volume and battery icons; `item_at()` maps an x offset to a `StatusItem`; device, `Idle` or `Disabled`, SSID, percent or `Plugged in` label shown only while hovered; pure selection functions.
+- `status_widget.{h,cpp}`: Bluetooth, network, volume and battery icons; `item_at()` maps an x offset to a `StatusItem`; device, `Idle` or `Disabled`, SSID, percent or `Plugged in` label shown while hovered or while `pin()`ed by its open panel; pure selection functions.
 
 ## `src/render/`
 
@@ -96,8 +95,9 @@
 - `image_decode.{h,cpp}`: `SurfacePtr` and `decode_image()`: `stb_image` rasters or `resvg` SVGs into premultiplied cairo surfaces, optionally fit to a size.
 - `draw.{h,cpp}`: `set_source()` and `rounded_rect()` cairo helpers shared by every module.
 - `x_window.{h,cpp}`: `XWindow`: 32-bit (or root-depth fallback) window with own colormap, name and class, GC, lazily sized pixmap and cairo context (`place()`, `release()`), raise/map with optional focus take (`show()`, `focus()`), unmap with focus restore (`hide()`), `clear()`, `present()`; optional override-redirect.
-- `panel_chrome.{h,cpp}`: Shared panel drawing on cairo: card, header with close button, toggle, slider, icon button, section label, device row, centered message, confirm card; `PanelRect`/`PanelHit` click regions; pure `slider_percent_at()`, `panel_clamp_scroll()`, `panel_intersect()`, `panel_hit_at()`.
-- `panel_window.{h,cpp}`: `PanelWindow` on an `XWindow`: placed by `open(right_margin, top)` on the primary output, takes focus, closes on focus loss, height up to a fixed max, pixmap allocated on first paint and freed on close, owner gets the remaining events.
+- `panel_chrome.{h,cpp}`: `panel_config::` shared panel geometry and fonts; shared panel drawing on cairo: card, header with close button, toggle, icon button, section label, device row, centered message, confirm card; `PanelRect`/`PanelHit` click regions; pure `panel_clamp_scroll()`, `panel_intersect()`, `panel_hit_at()`.
+- `slider.{h,cpp}`: `draw_slider()`: track, accent fill ending under a 12 px white knob inset so it never leaves the track, optional accent focus dot for the dragged, hovered or selected slider; pure `slider_percent_at()` over the same inset range.
+- `panel_window.{h,cpp}`: `PanelWindow` on an `XWindow`: placed by `open(right_margin, top)` on the primary output, takes focus, grabs the pointer with owner events on first expose so a click outside any shell window closes it, also closes on focus loss, emits `changed` on open and close, height up to a fixed max, pixmap allocated on first paint and freed on close, owner gets the remaining events.
 
 ## `src/modules/bar/panel/`
 

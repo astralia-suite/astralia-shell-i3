@@ -23,7 +23,7 @@ void panel(cairo_t *cr, double x, double y, double w, double h, double r, const 
     cairo_fill(cr);
     double inset = cfg::border_width / 2.0;
     rounded_rect(cr, x + inset, y + inset, w - cfg::border_width, h - cfg::border_width, r - inset);
-    set_source(cr, cfg::border);
+    set_source(cr, palette::accent);
     cairo_set_line_width(cr, cfg::border_width);
     cairo_stroke(cr);
 }
@@ -173,19 +173,19 @@ void Polkit::paint() {
     cairo_paint(cr);
     cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
 
-    panel(cr, card_x, card_y, cfg::card_width, card_h, cfg::card_radius, cfg::background);
+    panel(cr, card_x, card_y, cfg::card_width, card_h, cfg::card_radius, palette::overlay);
 
     double content_x = card_x + cfg::card_pad;
     double content_w = cfg::card_width - cfg::card_pad * 2.0;
     double content_cx = content_x + content_w / 2.0;
     double y = card_y + cfg::card_pad;
 
-    set_source(cr, cfg::title);
+    set_source(cr, palette::text);
     title_.set(cfg::title_text);
     title_.draw(cr, content_x, y + (cfg::title_line_height - title_.height()) / 2.0);
     y += cfg::title_line_height + cfg::spacing;
 
-    set_source(cr, cfg::muted);
+    set_source(cr, palette::text_muted);
     std::string message = service_.message();
     message_.set(message);
     while (message_.width() > content_w && !message.empty()) {
@@ -195,16 +195,16 @@ void Polkit::paint() {
     message_.draw(cr, content_x, y + (cfg::message_line_height - message_.height()) / 2.0);
     y += cfg::message_line_height + cfg::spacing;
 
-    panel(cr, content_x, y, content_w, cfg::field_height, cfg::field_radius, cfg::field_background);
+    panel(cr, content_x, y, content_w, cfg::field_height, cfg::field_radius, palette::field_bg);
     double field_cy = y + cfg::field_height / 2.0;
     double dots_w = content_w - cfg::dot_margin * 2.0;
     std::size_t dots = polkit_visible_dots(utf8_length(password_), dots_w);
     if (needs_input && error_shown_) {
-        set_source(cr, cfg::error);
+        set_source(cr, palette::critical);
         field_.set(cfg::error_text);
         field_.draw_ink_centered(cr, content_cx, field_cy);
     } else if (needs_input && dots == 0) {
-        set_source(cr, cfg::muted);
+        set_source(cr, palette::text_muted);
         field_.set(cfg::password_placeholder);
         field_.draw_ink_centered(cr, content_cx, field_cy);
     } else if (needs_input) {
@@ -222,14 +222,14 @@ void Polkit::paint() {
                 cairo_paint(cr);
                 cairo_restore(cr);
             } else {
-                set_source(cr, cfg::dot);
+                set_source(cr, palette::text);
                 cairo_arc(cr, gx + cfg::dot_size / 2.0, field_cy, cfg::dot_size / 2.0, 0.0,
                           2.0 * std::numbers::pi);
                 cairo_fill(cr);
             }
         }
     } else {
-        set_source(cr, cfg::muted);
+        set_source(cr, palette::text_muted);
         field_.set(cfg::authenticating_text);
         field_.draw_ink_centered(cr, content_cx, field_cy);
     }
@@ -237,7 +237,7 @@ void Polkit::paint() {
 
     if (show_info) {
         y += cfg::spacing;
-        set_source(cr, cfg::muted);
+        set_source(cr, palette::text_muted);
         info_.set(info);
         info_.draw(cr, content_x, y + (cfg::info_line_height - info_.height()) / 2.0);
     }

@@ -3,8 +3,6 @@
 #include <array>
 #include <numbers>
 
-#include "render/palette.h"
-
 namespace astralia {
 
 struct LogoutAction {
@@ -29,12 +27,6 @@ inline constexpr double step_angle = 2.0 * std::numbers::pi / button_count;
 
 // Typography
 inline constexpr const char *glyph_font = "Yuji Mai 55px";
-
-// Colors
-inline constexpr Color button_fill = palette::field_bg;
-inline constexpr Color border = palette::accent;
-inline constexpr Color highlight_border = palette::accent_alt;
-inline constexpr Color glyph = palette::text;
 
 // Logo
 inline constexpr const char *logo_file = "logo.png";

@@ -5,7 +5,6 @@
 #include <utility>
 
 #include "config/bar_config.h"
-#include "config/panel_config.h"
 
 #include "core/log.h"
 
@@ -40,21 +39,21 @@ bool secured(const NetworkInfo &info) {
 std::vector<Row> build_rows(const NetworkService &network) {
     std::vector<Row> rows;
     if (!network.last_error().empty()) {
-        rows.push_back({Row::error, panel_config::row_height, network.last_error()});
+        rows.push_back({Row::error, bar_config::panel_row_height, network.last_error()});
     }
     if (network.status().kind == NetworkKind::ethernet) {
-        rows.push_back({Row::message, panel_config::row_height, "Connected via Ethernet"});
+        rows.push_back({Row::message, bar_config::panel_row_height, "Connected via Ethernet"});
     }
     if (!network.wifi_available()) {
-        rows.push_back({Row::message, panel_config::empty_height, "No Wi-Fi adapter found"});
+        rows.push_back({Row::message, bar_config::panel_empty_height, "No Wi-Fi adapter found"});
         return rows;
     }
     if (!network.wifi_enabled()) {
-        rows.push_back({Row::message, panel_config::empty_height, "Wi-Fi is disabled"});
+        rows.push_back({Row::message, bar_config::panel_empty_height, "Wi-Fi is disabled"});
         return rows;
     }
     if (network_visible_count(network.networks()) == 0) {
-        rows.push_back({Row::message, panel_config::empty_height, "Scanning\xE2\x80\xA6"});
+        rows.push_back({Row::message, bar_config::panel_empty_height, "Scanning\xE2\x80\xA6"});
     }
     auto add_bucket = [&](const char *title, auto belongs) {
         std::vector<const NetworkInfo *> bucket;
@@ -71,9 +70,9 @@ std::vector<Row> build_rows(const NetworkService &network) {
             int band_b = signal_band(b->signal);
             return band_a != band_b ? band_a > band_b : a->signal > b->signal;
         });
-        rows.push_back({Row::section, panel_config::section_height, title});
+        rows.push_back({Row::section, bar_config::panel_section_height, title});
         for (const NetworkInfo *info : bucket) {
-            rows.push_back({Row::network, panel_config::row_height, info->ssid, info});
+            rows.push_back({Row::network, bar_config::panel_row_height, info->ssid, info});
         }
     };
     add_bucket("Connected", [](const NetworkInfo &i) { return i.connected; });
@@ -152,7 +151,7 @@ const char *network_signal_icon(int percent) {
 
 NetworkPanel::NetworkPanel(XConnection &x, EventLoop &loop, NetworkService &network)
     : network_(network),
-      window_(x, loop, "astralia-network-panel", panel_config::width, panel_config::max_height, [this](const xcb_generic_event_t &event) { handle(event); }, [this] {
+      window_(x, loop, "astralia-network-panel", bar_config::panel_width, bar_config::panel_max_height, [this](const xcb_generic_event_t &event) { handle(event); }, [this] {
                   network_.stop_watch();
                   scroll_ = 0;
                   sub_ = Sub::none;
@@ -185,9 +184,9 @@ void NetworkPanel::handle(const xcb_generic_event_t &event) {
         if (button.detail == XCB_BUTTON_INDEX_1) {
             click(button.event_x, button.event_y);
         } else if (button.detail == XCB_BUTTON_INDEX_4) {
-            scroll(-panel_config::scroll_step);
+            scroll(-bar_config::panel_scroll_step);
         } else if (button.detail == XCB_BUTTON_INDEX_5) {
-            scroll(panel_config::scroll_step);
+            scroll(bar_config::panel_scroll_step);
         }
         break;
     }
@@ -322,7 +321,7 @@ void NetworkPanel::paint() {
     constexpr double pad = panel_config::padding;
     std::vector<Row> rows = build_rows(network_);
     double prompt_height = sub_ == Sub::password ? bar_config::panel_echo_row_height : panel_config::label_height;
-    double sub_space = sub_ != Sub::none ? panel_config::card_gap + panel_confirm_height(prompt_height) : 0.0;
+    double sub_space = sub_ != Sub::none ? bar_config::panel_card_gap + panel_confirm_height(prompt_height) : 0.0;
     double top = panel_content_top();
     content_height_ = rows_height(rows);
     main_height_ = static_cast<int>(std::min<double>(window_.max_height() - sub_space, top + content_height_ + pad));
@@ -341,7 +340,7 @@ void NetworkPanel::paint() {
         hits_.push_back({toggle, wifi, {}});
         PanelRect refresh = panel_draw_icon_button(cr, toggle.x - panel_config::row_gap - panel_config::button_size,
                                                    header_mid - panel_config::button_size / 2.0, icon::refresh,
-                                                   network_.scanning() ? palette::accent : bar_config::foreground);
+                                                   network_.scanning() ? palette::accent : palette::text);
         hits_.push_back({refresh, rescan, {}});
     }
 
@@ -356,7 +355,7 @@ void NetworkPanel::paint() {
             switch (row.kind) {
             case Row::error: {
                 double reserve = panel_config::button_size + 8.0;
-                panel_draw_device_row(cr, rect, icon::alert_triangle, row.text, {}, panel_config::error, palette::critical, reserve);
+                panel_draw_device_row(cr, rect, icon::alert_triangle, row.text, {}, palette::critical_alpha15, palette::critical, reserve);
                 PanelRect button = panel_draw_icon_button(cr, rect.x + rect.w - reserve, rect.y + (rect.h - panel_config::button_size) / 2.0, icon::close, palette::critical);
                 hits_.push_back({panel_intersect(button, area), dismiss_error, {}});
                 break;
@@ -376,12 +375,12 @@ void NetworkPanel::paint() {
                                        : portal        ? "Sign in required"
                                        : secured(info) ? info.security
                                                        : "Open";
-                const Color &background = info.connected ? panel_config::row_active
-                                          : busy         ? panel_config::row_busy
-                                                         : panel_config::row;
+                const Color &background = info.connected ? palette::accent_alpha25
+                                          : busy         ? palette::accent_alpha12
+                                                         : palette::text_alpha06;
                 const Color &foreground = portal           ? palette::warn
                                           : info.connected ? palette::accent
-                                                           : bar_config::foreground;
+                                                           : palette::text;
                 double reserve = can_forget ? panel_config::button_size + 8.0 : 0.0;
                 panel_draw_device_row(cr, rect, network_signal_icon(info.signal), info.ssid, subtitle, background, foreground, reserve);
                 if (can_forget) {
@@ -397,7 +396,7 @@ void NetworkPanel::paint() {
     }
     cairo_restore(cr);
 
-    double sub_y = main_height_ + panel_config::card_gap;
+    double sub_y = main_height_ + bar_config::panel_card_gap;
     switch (sub_) {
     case Sub::password: {
         panel_draw_confirm(cr, sub_y, width, sub_ssid_, password_.empty() ? "Type the password" : "", "Connect", hits_, cancel, confirm, prompt_height);

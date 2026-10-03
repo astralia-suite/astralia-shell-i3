@@ -21,7 +21,7 @@
 - `src/core/`: non-visual infrastructure (X connection, event loop, D-Bus, processes, IPC, logging); includes nothing from `render/`, `modules/` or `service/`.
 - `src/render/`: every visual building block shared by modules (text, icons, palette, fonts, image decoding, cairo helpers, `XWindow`, panel chrome and window); includes `core/` and `config/`, never `modules/` or `service/`.
 - `src/modules/`: user-facing shell parts (bar, launcher, …); module-exclusive code only, anything two modules could share belongs in `render/` or `core/`.
-- `src/config/`: per-module constants and plain data types, plus `panel_config.h` for `render/`'s panel chrome.
+- `src/config/`: per-module constants and plain data types; shared render constants live in their `render/` header (e.g. `panel_config::` in `panel_chrome.h`), as in `hl`.
 - `src/service/`: data providers shared by modules (workspaces, windows, …).
 - `src/plugin/`: optional `dlopen`-loaded code.
 - `test/`: tests for `src/` code, built as `astralia-shell-test`.
@@ -38,6 +38,7 @@
 
 - `src/config/*.h` holds constants and plain data types only, no function bodies (helpers that compute from a config value live with their consumer).
 - One config header per module, named `<module>_config.h`; a module's private components (e.g. `bar`'s panels) share it rather than getting their own.
+- No colour aliases in config headers: code reads `palette::` directly, and a new colour is added to `render/palette.h` as `color("#RRGGBBAA")`, never as a `{r, g, b, a}` literal.
 
 ## Service structure
 

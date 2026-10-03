@@ -2,11 +2,11 @@
 #include <format>
 
 #include "config/bar_config.h"
-#include "config/panel_config.h"
 
 #include "modules/bar/panel/control_center_panel.h"
 
 #include "render/icons.h"
+#include "render/slider.h"
 
 namespace astralia {
 
@@ -15,7 +15,9 @@ ControlCenterPanel::Slider::Slider() : icon(bar_config::icon_font), label(bar_co
 ControlCenterPanel::ControlCenterPanel(XConnection &x, EventLoop &loop, Services &services)
     : brightness_(services.brightness), audio_(services.audio),
       percent_sample_(bar_config::font),
-      window_(x, loop, "astralia-control-center", panel_config::width, static_cast<int>(panel_content_top()) + panel_config::padding + static_cast<int>(sliders_.size()) * bar_config::control_center_row_height, [this](const xcb_generic_event_t &event) { handle(event); }, [this] { dragging_.reset(); }) {
+      window_(x, loop, "astralia-control-center", bar_config::panel_width, static_cast<int>(panel_content_top()) + panel_config::padding + static_cast<int>(sliders_.size()) * bar_config::control_center_row_height, [this](const xcb_generic_event_t &event) { handle(event); }, [this] {
+          dragging_.reset();
+          hovered_.reset(); }) {
     percent_sample_.set(bar_config::control_center_percent_sample);
     brightness_.changed.connect([this] {
         if (window_.is_open() && dragging_ != brightness) {
@@ -75,19 +77,37 @@ void ControlCenterPanel::handle(const xcb_generic_event_t &event) {
         break;
     }
     case XCB_BUTTON_RELEASE:
-        if (reinterpret_cast<const xcb_button_release_event_t &>(event).detail ==
-            XCB_BUTTON_INDEX_1) {
+        if (const auto &release = reinterpret_cast<const xcb_button_release_event_t &>(event); release.detail == XCB_BUTTON_INDEX_1 && dragging_) {
             dragging_.reset();
+            std::optional<Row> row = row_at(release.event_y);
+            hovered_ = row && sliders_[*row].enabled ? row : std::nullopt;
+            paint();
         }
         break;
-    case XCB_MOTION_NOTIFY:
+    case XCB_MOTION_NOTIFY: {
+        const auto &motion = reinterpret_cast<const xcb_motion_notify_event_t &>(event);
         if (dragging_) {
-            const auto &motion = reinterpret_cast<const xcb_motion_notify_event_t &>(event);
             apply(*dragging_, slider_percent_at(track_x(), track_width(), motion.event_x));
+            break;
+        }
+        std::optional<Row> row = row_at(motion.event_y);
+        hover(row && sliders_[*row].enabled ? row : std::nullopt);
+        break;
+    }
+    case XCB_LEAVE_NOTIFY:
+        if (!dragging_) {
+            hover(std::nullopt);
         }
         break;
     default:
         break;
+    }
+}
+
+void ControlCenterPanel::hover(std::optional<Row> row) {
+    if (row != hovered_) {
+        hovered_ = row;
+        paint();
     }
 }
 
@@ -185,7 +205,7 @@ void ControlCenterPanel::paint() {
                   static_cast<int>(i) * bar_config::control_center_row_height;
         set_source(cr, !slider.enabled ? palette::text_dim
                        : slider.muted  ? palette::text_muted
-                                       : bar_config::foreground);
+                                       : palette::text);
         slider.icon.draw_centered(cr, panel_config::padding, top,
                                   bar_config::control_center_row_height);
         slider.label.draw_centered(cr, width - panel_config::padding - slider.label.width(),
@@ -193,7 +213,8 @@ void ControlCenterPanel::paint() {
         PanelRect track{static_cast<double>(track_left), static_cast<double>(top),
                         static_cast<double>(track_span),
                         static_cast<double>(bar_config::control_center_row_height)};
-        panel_draw_slider(cr, track, slider.enabled ? slider.percent : 0, slider.muted);
+        Row row = static_cast<Row>(i);
+        draw_slider(cr, track, slider.enabled ? slider.percent : 0, slider.muted, slider.enabled && (dragging_ == row || hovered_ == row));
     }
     window_.present();
 }

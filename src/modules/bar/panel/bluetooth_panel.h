@@ -19,6 +19,7 @@ class BluetoothPanel {
     BluetoothPanel(XConnection &x, EventLoop &loop, BluetoothService &bluetooth);
 
     void toggle();
+    PanelWindow &window() { return window_; }
 
   private:
     enum Action { close_panel = 1,

@@ -22,6 +22,7 @@ class ControlCenterPanel {
     ControlCenterPanel(XConnection &x, EventLoop &loop, Services &services);
 
     void toggle();
+    PanelWindow &window() { return window_; }
 
   private:
     enum Row : std::size_t { brightness,
@@ -41,6 +42,7 @@ class ControlCenterPanel {
     void sync_brightness();
     void sync_volume();
     void handle(const xcb_generic_event_t &event);
+    void hover(std::optional<Row> row);
     void press(int x, int y, xcb_button_t button);
     void apply(Row row, int percent);
     std::optional<Row> row_at(int y) const;
@@ -53,6 +55,7 @@ class ControlCenterPanel {
     std::array<Slider, 2> sliders_;
     Text percent_sample_;
     std::optional<Row> dragging_;
+    std::optional<Row> hovered_;
     std::vector<PanelHit> hits_;
     PanelWindow window_;
 };

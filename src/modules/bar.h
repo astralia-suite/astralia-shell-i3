@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cairo.h>
+#include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -26,7 +28,9 @@ class ControlCenterPanel;
 class ControlCenterWidget;
 class LogoutWidget;
 class NetworkPanel;
+class PanelWindow;
 class StatusWidget;
+enum class StatusItem : std::size_t;
 
 class Bar {
   public:
@@ -55,10 +59,17 @@ class Bar {
     void redraw_status();
     void notify(const std::string &app, const StatusMessage &message);
     void click(const xcb_button_press_event_t &event);
-    void hover(std::optional<int> x);
+    void hover(std::optional<int> x, bool redraw = false);
+    void close_panels_except(const PanelWindow *keep);
+    std::optional<StatusItem> open_item() const;
+    void sync_panels();
+    void start_linger();
+    void sync_hover();
+    std::chrono::milliseconds until_linger_end() const;
     Rect clock_rect() const;
 
     XConnection &x_;
+    EventLoop &loop_;
     IpcServer &ipc_;
     Services &services_;
     uint16_t width_;
@@ -80,6 +91,8 @@ class Bar {
     Rect workspace_rect_{};
     Rect status_rect_{};
     Rect control_center_rect_{};
+    std::chrono::steady_clock::time_point linger_until_{};
+    int linger_timer_ = -1;
 };
 
 } // namespace astralia

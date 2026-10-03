@@ -3,7 +3,6 @@
 #include <utility>
 
 #include "config/bar_config.h"
-#include "config/panel_config.h"
 
 #include "modules/bar/panel/bluetooth_panel.h"
 
@@ -25,10 +24,10 @@ struct Row {
 std::vector<Row> build_rows(const BluetoothService &bluetooth) {
     const BluetoothStatus &status = bluetooth.status();
     if (!status.present) {
-        return {{Row::message, panel_config::empty_height, "No adapter found"}};
+        return {{Row::message, bar_config::panel_empty_height, "No adapter found"}};
     }
     if (!status.powered) {
-        return {{Row::message, panel_config::empty_height, "Bluetooth is off"}};
+        return {{Row::message, bar_config::panel_empty_height, "Bluetooth is off"}};
     }
     std::vector<Row> rows;
     auto add_bucket = [&](const char *title, auto belongs) {
@@ -38,16 +37,16 @@ std::vector<Row> build_rows(const BluetoothService &bluetooth) {
                 continue;
             }
             if (std::exchange(first, false)) {
-                rows.push_back({Row::section, panel_config::section_height, title});
+                rows.push_back({Row::section, bar_config::panel_section_height, title});
             }
-            rows.push_back({Row::item, panel_config::row_height, d.name, &d});
+            rows.push_back({Row::item, bar_config::panel_row_height, d.name, &d});
         }
     };
     add_bucket("Connected", [](const BluetoothDevice &d) { return d.connected; });
     add_bucket("Paired", [](const BluetoothDevice &d) { return !d.connected && (d.paired || d.trusted); });
     add_bucket("Nearby", [](const BluetoothDevice &d) { return !d.connected && !d.paired && !d.trusted; });
     if (rows.empty()) {
-        rows.push_back({Row::message, panel_config::empty_height, "Searching for devices\xE2\x80\xA6"});
+        rows.push_back({Row::message, bar_config::panel_empty_height, "Searching for devices\xE2\x80\xA6"});
     }
     return rows;
 }
@@ -64,7 +63,7 @@ int rows_height(const std::vector<Row> &rows) {
 
 BluetoothPanel::BluetoothPanel(XConnection &x, EventLoop &loop, BluetoothService &bluetooth)
     : bluetooth_(bluetooth),
-      window_(x, loop, "astralia-bluetooth-panel", panel_config::width, panel_config::max_height, [this](const xcb_generic_event_t &event) { handle(event); }, [this] {
+      window_(x, loop, "astralia-bluetooth-panel", bar_config::panel_width, bar_config::panel_max_height, [this](const xcb_generic_event_t &event) { handle(event); }, [this] {
                   bluetooth_.stop_discovery();
                   scroll_ = 0;
                   confirm_path_.clear(); }) {
@@ -104,9 +103,9 @@ void BluetoothPanel::handle(const xcb_generic_event_t &event) {
         if (button.detail == XCB_BUTTON_INDEX_1) {
             click(button.event_x, button.event_y);
         } else if (button.detail == XCB_BUTTON_INDEX_4) {
-            scroll(-panel_config::scroll_step);
+            scroll(-bar_config::panel_scroll_step);
         } else if (button.detail == XCB_BUTTON_INDEX_5) {
-            scroll(panel_config::scroll_step);
+            scroll(bar_config::panel_scroll_step);
         }
         break;
     }
@@ -194,7 +193,7 @@ void BluetoothPanel::paint() {
             confirm_path_.clear();
         }
     }
-    double confirm_space = target != nullptr ? panel_config::card_gap + panel_confirm_height() : 0.0;
+    double confirm_space = target != nullptr ? bar_config::panel_card_gap + panel_confirm_height() : 0.0;
     double top = panel_content_top();
     content_height_ = rows_height(rows);
     main_height_ = static_cast<int>(std::min<double>(window_.max_height() - confirm_space, top + content_height_ + pad));
@@ -231,10 +230,10 @@ void BluetoothPanel::paint() {
                 std::string subtitle = d.connecting     ? "Connecting\xE2\x80\xA6"
                                        : d.battery >= 0 ? std::to_string(d.battery) + "%"
                                                         : std::string();
-                const Color &background = d.connected    ? panel_config::row_active
-                                          : d.connecting ? panel_config::row_busy
-                                                         : panel_config::row;
-                const Color &foreground = d.connected ? palette::accent : bar_config::foreground;
+                const Color &background = d.connected    ? palette::accent_alpha25
+                                          : d.connecting ? palette::accent_alpha12
+                                                         : palette::text_alpha06;
+                const Color &foreground = d.connected ? palette::accent : palette::text;
                 double reserve = can_forget ? panel_config::button_size + 8.0 : 0.0;
                 panel_draw_device_row(cr, rect, d.connected ? icon::bluetooth_connected : icon::bluetooth_device, d.name, subtitle, background, foreground, reserve);
                 hits_.push_back({panel_intersect(rect, area), device, d.path});
@@ -251,7 +250,7 @@ void BluetoothPanel::paint() {
 
     if (target != nullptr) {
         bool disconnecting = confirm_action_ == device;
-        panel_draw_confirm(cr, main_height_ + panel_config::card_gap, width, target->name,
+        panel_draw_confirm(cr, main_height_ + bar_config::panel_card_gap, width, target->name,
                            disconnecting ? "Disconnect this device?" : "Forget this device?",
                            disconnecting ? "Disconnect" : "Forget", hits_, cancel, confirm);
     }

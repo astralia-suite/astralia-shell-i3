@@ -187,17 +187,17 @@ void Logout::paint() {
         double y = c.y - size / 2.0;
         double radius = cfg::button_corner_radius * scale;
         rounded_rect(cr, x, y, size, size, radius);
-        set_source(cr, cfg::button_fill);
+        set_source(cr, palette::field_bg);
         cairo_fill(cr);
         constexpr double inset = cfg::border_width / 2.0;
         rounded_rect(cr, x + inset, y + inset, size - cfg::border_width, size - cfg::border_width,
                      radius - inset);
-        set_source(cr, highlighted ? cfg::highlight_border : cfg::border);
+        set_source(cr, highlighted ? palette::accent_alt : palette::accent);
         cairo_set_line_width(cr, cfg::border_width);
         cairo_stroke(cr);
 
         glyph_.set(cfg::actions[i].glyph);
-        set_source(cr, cfg::glyph);
+        set_source(cr, palette::text);
         glyph_.draw_ink_centered(cr, c.x, c.y);
     }
 

@@ -7,6 +7,7 @@
 
 #include "core/event_loop.h"
 #include "core/keyboard.h"
+#include "core/signal.h"
 #include "core/x_connection.h"
 
 #include "render/x_window.h"
@@ -31,15 +32,19 @@ class PanelWindow {
     void clear();
     void present();
 
+    Signal<> changed;
+
   private:
     void handle(const xcb_generic_event_t &event);
     void place();
+    void grab();
 
     XConnection &x_;
     Keyboard keyboard_;
     Handler handler_;
     std::function<void()> closed_;
     bool open_ = false;
+    bool grabbed_ = false;
     int width_;
     int height_;
     int max_height_;

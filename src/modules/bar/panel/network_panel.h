@@ -22,6 +22,7 @@ class NetworkPanel {
     NetworkPanel(XConnection &x, EventLoop &loop, NetworkService &network);
 
     void toggle();
+    PanelWindow &window() { return window_; }
 
   private:
     enum Action { close_panel = 1,

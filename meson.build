@@ -120,6 +120,7 @@ core = static_library(
     'src/render/image_decode.cpp',
     'src/render/panel_chrome.cpp',
     'src/render/panel_window.cpp',
+    'src/render/slider.cpp',
     'src/render/text.cpp',
     'src/render/x_window.cpp',
     'src/service/audio_service.cpp',

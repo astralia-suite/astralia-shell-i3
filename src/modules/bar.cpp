@@ -29,7 +29,7 @@
 namespace astralia {
 
 Bar::Bar(XConnection &x, EventLoop &loop, IpcServer &ipc, Services &services)
-    : x_(x), ipc_(ipc), services_(services),
+    : x_(x), loop_(loop), ipc_(ipc), services_(services),
       window_(x, "astralia-shell", XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_POINTER_MOTION | XCB_EVENT_MASK_LEAVE_WINDOW, false) {
     register_app_fonts();
     clock_ = std::make_unique<ClockWidget>();
@@ -64,6 +64,10 @@ Bar::Bar(XConnection &x, EventLoop &loop, IpcServer &ipc, Services &services)
     battery_panel_ = std::make_unique<BatteryPanel>(x_, loop, services_.battery);
     bluetooth_panel_ = std::make_unique<BluetoothPanel>(x_, loop, services_.bluetooth);
     network_panel_ = std::make_unique<NetworkPanel>(x_, loop, services_.network);
+    for (PanelWindow *panel : {&control_center_panel_->window(), &bluetooth_panel_->window(), &network_panel_->window(),
+                               &audio_panel_->window(), &battery_panel_->window()}) {
+        panel->changed.connect([this] { sync_panels(); });
+    }
 
     clock_->refresh();
     status_->update(services_.bluetooth.status(), services_.network.status(),
@@ -84,7 +88,11 @@ Bar::Bar(XConnection &x, EventLoop &loop, IpcServer &ipc, Services &services)
             hover(reinterpret_cast<const xcb_motion_notify_event_t &>(event).event_x);
             break;
         case XCB_LEAVE_NOTIFY:
-            hover(std::nullopt);
+            // A panel's pointer grab sends a grab-mode leave while the cursor is still on the widget, and closing it can race a stray leave, so keep the widget expanded until the linger re-checks the real position.
+            if (reinterpret_cast<const xcb_leave_notify_event_t &>(event).mode == XCB_NOTIFY_MODE_NORMAL &&
+                std::chrono::steady_clock::now() >= linger_until_) {
+                hover(std::nullopt);
+            }
             break;
         default:
             break;
@@ -93,6 +101,7 @@ Bar::Bar(XConnection &x, EventLoop &loop, IpcServer &ipc, Services &services)
     loop.add_timer([] { return ms_until_next_second(std::chrono::system_clock::now()); },
                    [this] { redraw_clock(); });
     loop.add_timer([] { return bar_config::trim_interval; }, [] { malloc_trim(0); });
+    linger_timer_ = loop.add_timer([this] { return until_linger_end(); }, [this] { sync_hover(); });
 
     window_.show(false);
 }
@@ -117,7 +126,7 @@ void Bar::set_hints(const OutputGeometry &output) {
 
 void Bar::paint_background(const Rect &rect) {
     cairo_set_operator(window_.cr(), CAIRO_OPERATOR_SOURCE);
-    set_source(window_.cr(), bar_config::background);
+    set_source(window_.cr(), palette::base_alpha80);
     cairo_rectangle(window_.cr(), rect.x, rect.y, rect.width, rect.height);
     cairo_fill(window_.cr());
     cairo_set_operator(window_.cr(), CAIRO_OPERATOR_OVER);
@@ -125,10 +134,10 @@ void Bar::paint_background(const Rect &rect) {
 
 void Bar::paint_panel() {
     constexpr double inset = bar_config::border_width / 2.0;
-    set_source(window_.cr(), bar_config::background);
+    set_source(window_.cr(), palette::base_alpha80);
     rounded_rect(window_.cr(), panel_.x, panel_.y, panel_.width, panel_.height, bar_config::corner_radius);
     cairo_fill(window_.cr());
-    set_source(window_.cr(), bar_config::border);
+    set_source(window_.cr(), palette::accent);
     cairo_set_line_width(window_.cr(), bar_config::border_width);
     rounded_rect(window_.cr(), panel_.x + inset, panel_.y + inset, panel_.width - 2 * inset,
                  panel_.height - 2 * inset, bar_config::corner_radius - inset);
@@ -138,7 +147,7 @@ void Bar::paint_panel() {
 void Bar::draw_divider(const Rect &left, const Rect &right) {
     double x = (left.x + left.width + right.x) / 2.0;
     double height = panel_.height * bar_config::divider_height_ratio;
-    set_source(window_.cr(), bar_config::divider);
+    set_source(window_.cr(), palette::text_alpha20);
     cairo_rectangle(window_.cr(), std::floor(x), panel_.y + (panel_.height - height) / 2.0,
                     bar_config::divider_width, height);
     cairo_fill(window_.cr());
@@ -152,7 +161,7 @@ void Bar::draw_all() {
     cairo_set_operator(window_.cr(), CAIRO_OPERATOR_OVER);
     paint_panel();
 
-    set_source(window_.cr(), bar_config::foreground);
+    set_source(window_.cr(), palette::text);
     logout_rect_ = {panel_.x + bar_config::padding_x, panel_.y, logout_->width(), panel_.height};
     logout_->draw(window_.cr(), logout_rect_.x, panel_.y, panel_.height);
     const I3Status &workspaces = services_.i3.status();
@@ -164,7 +173,7 @@ void Bar::draw_all() {
     clock_rect_ = clock_rect();
     draw_clock();
 
-    set_source(window_.cr(), bar_config::foreground);
+    set_source(window_.cr(), palette::text);
     int control_center_width = control_center_->width();
     control_center_rect_ = {panel_.x + panel_.width - bar_config::padding_x - control_center_width,
                             panel_.y, control_center_width, panel_.height};
@@ -178,7 +187,7 @@ void Bar::draw_all() {
 }
 
 void Bar::draw_clock() {
-    set_source(window_.cr(), bar_config::foreground);
+    set_source(window_.cr(), palette::text);
     clock_->draw(window_.cr(), panel_.x + panel_.width / 2.0, panel_.y + panel_.height / 2.0);
 }
 
@@ -223,44 +232,117 @@ void Bar::click(const xcb_button_press_event_t &event) {
     if (event.detail != XCB_BUTTON_INDEX_1) {
         return;
     }
-    if (logout_rect_.contains(event.event_x)) {
-        ipc_.dispatch("logout");
-    } else if (control_center_rect_.contains(event.event_x)) {
-        control_center_panel_->toggle();
+    start_linger();
+    auto toggle_only = [this](auto &panel) {
+        close_panels_except(&panel.window());
+        panel.toggle();
+    };
+    if (control_center_rect_.contains(event.event_x)) {
+        toggle_only(*control_center_panel_);
     } else if (std::optional<StatusItem> item = status_rect_.contains(event.event_x)
                                                     ? status_->item_at(event.event_x - status_rect_.x)
                                                     : std::nullopt) {
         switch (*item) {
         case StatusItem::bluetooth:
-            bluetooth_panel_->toggle();
+            toggle_only(*bluetooth_panel_);
             break;
         case StatusItem::network:
-            network_panel_->toggle();
+            toggle_only(*network_panel_);
             break;
         case StatusItem::volume:
-            audio_panel_->toggle();
+            toggle_only(*audio_panel_);
             break;
         case StatusItem::battery:
-            battery_panel_->toggle();
+            toggle_only(*battery_panel_);
             break;
         }
-    } else if (workspace_rect_.contains(event.event_x)) {
-        if (auto index = workspace_at(services_.i3.status(), event.event_x - workspace_rect_.x)) {
-            services_.i3.switch_to(*index);
+    } else {
+        close_panels_except(nullptr);
+        if (logout_rect_.contains(event.event_x)) {
+            ipc_.dispatch("logout");
+        } else if (workspace_rect_.contains(event.event_x)) {
+            if (auto index = workspace_at(services_.i3.status(), event.event_x - workspace_rect_.x)) {
+                services_.i3.switch_to(*index);
+            }
         }
     }
 }
 
-void Bar::hover(std::optional<int> x) {
+void Bar::close_panels_except(const PanelWindow *keep) {
+    for (PanelWindow *panel : {&control_center_panel_->window(), &bluetooth_panel_->window(), &network_panel_->window(),
+                               &audio_panel_->window(), &battery_panel_->window()}) {
+        if (panel != keep) {
+            panel->close();
+        }
+    }
+}
+
+std::optional<StatusItem> Bar::open_item() const {
+    if (bluetooth_panel_->window().is_open()) {
+        return StatusItem::bluetooth;
+    }
+    if (network_panel_->window().is_open()) {
+        return StatusItem::network;
+    }
+    if (audio_panel_->window().is_open()) {
+        return StatusItem::volume;
+    }
+    if (battery_panel_->window().is_open()) {
+        return StatusItem::battery;
+    }
+    return std::nullopt;
+}
+
+// Like hl, a status item stays expanded while its panel is open; on close it lingers briefly, then falls back to whether the cursor is on it.
+void Bar::sync_panels() {
+    if (std::optional<StatusItem> item = open_item()) {
+        if (status_->pin(item)) {
+            draw_all();
+        }
+        return;
+    }
+    start_linger();
+}
+
+void Bar::start_linger() {
+    linger_until_ = std::chrono::steady_clock::now() + bar_config::panel_close_linger;
+    loop_.reschedule(linger_timer_);
+}
+
+void Bar::hover(std::optional<int> x, bool redraw) {
     std::optional<int> offset;
     if (x && status_rect_.contains(*x)) {
         offset = *x - status_rect_.x;
     }
     bool logout_changed = logout_->hover(x && logout_rect_.contains(*x));
     bool status_changed = status_->hover(offset);
-    if (logout_changed || status_changed) {
+    if (logout_changed || status_changed || redraw) {
         draw_all();
     }
+}
+
+void Bar::sync_hover() {
+    if (std::chrono::steady_clock::now() < linger_until_) {
+        return;
+    }
+    xcb_query_pointer_reply_t *reply =
+        xcb_query_pointer_reply(x_.conn(), xcb_query_pointer(x_.conn(), window_.id()), nullptr);
+    if (reply == nullptr) {
+        return;
+    }
+    bool inside = reply->same_screen && reply->win_x >= 0 && reply->win_y >= 0 && reply->win_x < width_ && reply->win_y < height_;
+    int x = reply->win_x;
+    free(reply);
+    bool pinned = status_->pin(open_item());
+    hover(inside ? std::optional<int>(x) : std::nullopt, pinned);
+}
+
+std::chrono::milliseconds Bar::until_linger_end() const {
+    auto left = linger_until_ - std::chrono::steady_clock::now();
+    if (left < std::chrono::steady_clock::duration::zero()) {
+        return std::chrono::hours(1);
+    }
+    return std::chrono::ceil<std::chrono::milliseconds>(left);
 }
 
 Bar::Rect Bar::clock_rect() const {

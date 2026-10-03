@@ -92,16 +92,16 @@ void Osd::paint(Kind kind, int percent, bool muted) {
 
     constexpr double inset = cfg::border_width / 2.0;
     rounded_rect(cr, 0, 0, cfg::width, cfg::height, cfg::radius);
-    set_source(cr, cfg::background);
+    set_source(cr, palette::overlay);
     cairo_fill(cr);
     rounded_rect(cr, inset, inset, cfg::width - cfg::border_width, cfg::height - cfg::border_width,
                  cfg::radius - inset);
-    set_source(cr, cfg::border);
+    set_source(cr, palette::electro);
     cairo_set_line_width(cr, cfg::border_width);
     cairo_stroke(cr);
 
     icon_.set(glyph);
-    set_source(cr, muted ? cfg::muted : cfg::icon);
+    set_source(cr, muted ? palette::text_muted : palette::text);
     icon_.draw_ink_left(cr, cfg::content_margin, cfg::height / 2.0);
 
     constexpr double track_x = cfg::content_margin + cfg::icon_size + cfg::bar_margin;
@@ -109,17 +109,17 @@ void Osd::paint(Kind kind, int percent, bool muted) {
         cfg::width - track_x - cfg::bar_margin - cfg::label_width - cfg::content_margin;
     constexpr double track_y = (cfg::height - cfg::track_height) / 2.0;
     rounded_rect(cr, track_x, track_y, track_w, cfg::track_height, cfg::track_height / 2.0);
-    set_source(cr, cfg::track);
+    set_source(cr, palette::text_alpha11);
     cairo_fill(cr);
     double fill_w = track_w * std::clamp(percent, 0, 100) / 100.0;
     if (fill_w > 0.0) {
         rounded_rect(cr, track_x, track_y, fill_w, cfg::track_height, cfg::track_height / 2.0);
-        set_source(cr, muted ? cfg::muted : cfg::fill);
+        set_source(cr, muted ? palette::text_muted : palette::accent);
         cairo_fill(cr);
     }
 
     label_.set(muted ? std::string("muted") : std::format("{}%", percent));
-    set_source(cr, cfg::label);
+    set_source(cr, palette::text);
     label_.draw_centered(cr, cfg::width - cfg::content_margin - label_.width(), 0, cfg::height);
     window_.present();
 }

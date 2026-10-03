@@ -1,21 +1,11 @@
 #include <algorithm>
-#include <cmath>
 #include <numbers>
-
-#include "config/panel_config.h"
 
 #include "render/icons.h"
 #include "render/panel_chrome.h"
 #include "render/text.h"
 
 namespace astralia {
-
-int slider_percent_at(int track_x, int track_width, int px) {
-    if (track_width <= 0) {
-        return 0;
-    }
-    return std::clamp(static_cast<int>(std::lround((px - track_x) * 100.0 / track_width)), 0, 100);
-}
 
 int panel_clamp_scroll(int offset, int content_height, int visible_height) {
     return std::clamp(offset, 0, std::max(0, content_height - visible_height));
@@ -40,10 +30,10 @@ PanelRect panel_intersect(const PanelRect &a, const PanelRect &b) {
 
 void panel_draw_card(cairo_t *cr, double x, double y, double w, double h) {
     constexpr double inset = panel_config::border_width / 2.0;
-    set_source(cr, panel_config::background);
+    set_source(cr, palette::base_alpha80);
     rounded_rect(cr, x, y, w, h, metrics::radius_md);
     cairo_fill(cr);
-    set_source(cr, panel_config::border);
+    set_source(cr, palette::accent);
     cairo_set_line_width(cr, panel_config::border_width);
     rounded_rect(cr, x + inset, y + inset, w - 2 * inset, h - 2 * inset, metrics::radius_md - inset);
     cairo_stroke(cr);
@@ -68,7 +58,7 @@ int panel_text_width(const char *font, std::string_view text) {
 
 PanelRect panel_draw_icon_button(cairo_t *cr, double x, double y, const char *icon, const Color &color) {
     constexpr double size = panel_config::button_size;
-    set_source(cr, panel_config::button);
+    set_source(cr, palette::text_alpha08);
     cairo_arc(cr, x + size / 2.0, y + size / 2.0, size / 2.0, 0.0, 2.0 * std::numbers::pi);
     cairo_fill(cr);
     Text glyph(panel_config::icon_font);
@@ -92,27 +82,14 @@ PanelRect panel_draw_toggle(cairo_t *cr, double x, double y, bool on) {
     return {x, y, w, h};
 }
 
-void panel_draw_slider(cairo_t *cr, const PanelRect &track, int percent, bool muted) {
-    constexpr double h = panel_config::track_height;
-    double top = track.y + (track.h - h) / 2.0;
-    set_source(cr, panel_config::track);
-    rounded_rect(cr, track.x, top, track.w, h, h / 2.0);
-    cairo_fill(cr);
-    if (percent > 0) {
-        set_source(cr, muted ? palette::text_muted : panel_config::fill);
-        rounded_rect(cr, track.x, top, track.w * std::min(percent, 100) / 100.0, h, h / 2.0);
-        cairo_fill(cr);
-    }
-}
-
 double panel_draw_header(cairo_t *cr, double width, std::string_view title, std::vector<PanelHit> &hits, int close_action) {
     constexpr double pad = panel_config::padding;
     constexpr double header = panel_config::header_height;
-    panel_draw_text(cr, panel_config::title_font, title, pad, pad, header, 0, panel_config::foreground);
+    panel_draw_text(cr, panel_config::title_font, title, pad, pad, header, 0, palette::text);
     double close_x = width - pad - panel_config::button_size;
-    PanelRect close = panel_draw_icon_button(cr, close_x, pad + (header - panel_config::button_size) / 2.0, icon::close, panel_config::foreground);
+    PanelRect close = panel_draw_icon_button(cr, close_x, pad + (header - panel_config::button_size) / 2.0, icon::close, palette::text);
     hits.push_back({close, close_action, {}});
-    set_source(cr, panel_config::divider);
+    set_source(cr, palette::text_alpha08);
     cairo_rectangle(cr, pad, pad + header + panel_config::row_gap, width - 2 * pad, 1.0);
     cairo_fill(cr);
     return close_x - panel_config::row_gap;
@@ -164,7 +141,7 @@ void panel_draw_confirm(cairo_t *cr, double y, double width, std::string_view ti
     int inner = static_cast<int>(width - 2 * pad);
     panel_draw_card(cr, 0, y, width, panel_confirm_height(prompt_height));
     double top = y + pad;
-    panel_draw_text(cr, panel_config::font, title, pad, top, label, inner, panel_config::foreground);
+    panel_draw_text(cr, panel_config::font, title, pad, top, label, inner, palette::text);
     top += label;
     panel_draw_text(cr, panel_config::small_font, prompt, pad, top, prompt_height, inner, palette::text_dim);
     top += prompt_height + panel_config::row_gap;
@@ -172,16 +149,16 @@ void panel_draw_confirm(cairo_t *cr, double y, double width, std::string_view ti
     double button_w = (inner - panel_config::row_gap) / 2.0;
     PanelRect cancel{pad, top, button_w, button_h};
     PanelRect accept{pad + button_w + panel_config::row_gap, top, button_w, button_h};
-    set_source(cr, panel_config::button);
+    set_source(cr, palette::text_alpha08);
     rounded_rect(cr, cancel.x, cancel.y, cancel.w, cancel.h, metrics::radius_sm);
     cairo_fill(cr);
     set_source(cr, palette::accent);
     rounded_rect(cr, accept.x, accept.y, accept.w, accept.h, metrics::radius_sm);
     cairo_fill(cr);
     int cancel_w = panel_text_width(panel_config::font, "Cancel");
-    panel_draw_text(cr, panel_config::font, "Cancel", cancel.x + (cancel.w - cancel_w) / 2.0, cancel.y, cancel.h, 0, panel_config::foreground);
+    panel_draw_text(cr, panel_config::font, "Cancel", cancel.x + (cancel.w - cancel_w) / 2.0, cancel.y, cancel.h, 0, palette::text);
     int confirm_w = panel_text_width(panel_config::font, confirm);
-    panel_draw_text(cr, panel_config::font, confirm, accept.x + (accept.w - confirm_w) / 2.0, accept.y, accept.h, 0, panel_config::foreground);
+    panel_draw_text(cr, panel_config::font, confirm, accept.x + (accept.w - confirm_w) / 2.0, accept.y, accept.h, 0, palette::text);
     hits.push_back({cancel, cancel_action, {}});
     hits.push_back({accept, confirm_action, {}});
 }

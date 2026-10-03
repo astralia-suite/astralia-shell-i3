@@ -28,15 +28,6 @@ inline constexpr const char *app_font = "Comic Shanns Mono Bold 13";
 inline constexpr const char *summary_font = "Comic Shanns Mono Semi-Bold 17";
 inline constexpr const char *body_font = "Comic Shanns Mono 15";
 
-// Colors
-inline constexpr Color background = palette::overlay;
-inline constexpr Color border = palette::accent;
-inline constexpr Color critical_border = palette::critical;
-inline constexpr Color app = palette::accent;
-inline constexpr Color summary = palette::text;
-inline constexpr Color body = palette::text_muted;
-inline constexpr Color close = palette::text_muted;
-
 // Content
 inline constexpr const char *app_fallback = "Notification";
 

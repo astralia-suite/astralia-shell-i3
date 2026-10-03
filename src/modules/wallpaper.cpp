@@ -22,6 +22,8 @@
 #include "modules/wallpaper/config_file.h"
 #include "modules/wallpaper/image.h"
 
+#include "render/palette.h"
+
 namespace astralia {
 
 namespace {
@@ -93,8 +95,7 @@ void draw(XConnection &x, xcb_pixmap_t pixmap, const std::vector<Output> &output
     cairo_surface_t *surface = cairo_xcb_surface_create(
         x.conn(), pixmap, x.visual(), screen->width_in_pixels, screen->height_in_pixels);
     cairo_t *cr = cairo_create(surface);
-    const Color &fallback = wallpaper_config::fallback;
-    cairo_set_source_rgb(cr, fallback.r, fallback.g, fallback.b);
+    cairo_set_source_rgb(cr, palette::base.r, palette::base.g, palette::base.b);
     cairo_paint(cr);
     for (const Output &output : outputs) {
         paint_output(cr, output, file);

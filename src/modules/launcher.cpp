@@ -471,16 +471,16 @@ void Launcher::paint() {
     cairo_paint(cr);
     cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
 
-    fill_rounded(cr, box_x, box_y, cfg::width, box_h, metrics::radius_md, cfg::background);
+    fill_rounded(cr, box_x, box_y, cfg::width, box_h, metrics::radius_md, palette::base_alpha80);
     stroke_rounded(cr, box_x, box_y, cfg::width, box_h, metrics::radius_md, cfg::menu_border_width,
-                   cfg::border);
+                   palette::accent);
 
     double mode_x = box_x + cfg::menu_pad;
     double field_top = box_y + cfg::menu_pad;
     double center_y = field_top + cfg::search_height / 2.0;
     stroke_rounded(cr, mode_x, field_top, cfg::search_height, cfg::search_height,
-                   metrics::radius_sm, cfg::border_width, cfg::border);
-    set_source(cr, cfg::foreground);
+                   metrics::radius_sm, cfg::border_width, palette::accent);
+    set_source(cr, palette::text);
     glyph_.set(mode_icon(mode_));
     glyph_.draw(cr, mode_x + (cfg::search_height - glyph_.width()) / 2.0,
                 center_y - glyph_.height() / 2.0);
@@ -488,9 +488,9 @@ void Launcher::paint() {
     double field_x = mode_x + cfg::search_height + cfg::pad;
     double field_w = box_x + cfg::width - cfg::menu_pad - field_x;
     stroke_rounded(cr, field_x, field_top, field_w, cfg::search_height, metrics::radius_sm,
-                   cfg::border_width, cfg::border);
+                   cfg::border_width, palette::accent);
     double text_x = field_x + cfg::pad;
-    set_source(cr, cfg::foreground);
+    set_source(cr, palette::text);
     text_.set(elide(query_, cfg::max_row_chars));
     double caret_x = text_x;
     if (!query_.empty()) {
@@ -516,10 +516,10 @@ void Launcher::paint() {
             double y = list_top + slot * cfg::row_pitch;
             hits_.push_back({{content_x, y, row_w, cfg::row_height}, i});
             fill_rounded(cr, content_x, y, row_w, cfg::row_height, metrics::radius_sm,
-                         cfg::row_background);
+                         palette::text_alpha03);
             if (i == hovered_ && i != selected_) {
                 stroke_rounded(cr, content_x, y, row_w, cfg::row_height, metrics::radius_sm,
-                               cfg::border_width, cfg::hover);
+                               cfg::border_width, palette::accent);
             }
 
             double row_x = content_x + cfg::pad;
@@ -530,7 +530,7 @@ void Launcher::paint() {
                                          y + (cfg::row_height - h) / 2.0);
                 cairo_paint(cr);
             } else {
-                set_source(cr, cfg::foreground);
+                set_source(cr, palette::text);
                 glyph_.set(row.glyph);
                 glyph_.draw(cr, row_x + (cfg::icon_size - glyph_.width()) / 2.0,
                             y + (cfg::row_height - glyph_.height()) / 2.0);
@@ -538,7 +538,7 @@ void Launcher::paint() {
             row_x += cfg::icon_size + cfg::pad;
 
             text_.set(elide(row.label, cfg::max_row_chars));
-            set_source(cr, cfg::foreground);
+            set_source(cr, palette::text);
             if (row.subtitle.empty()) {
                 text_.draw(cr, row_x, y + (cfg::row_height - text_.height()) / 2.0);
                 continue;
@@ -548,7 +548,7 @@ void Launcher::paint() {
                 y +
                 (cfg::row_height - text_.height() - cfg::two_line_gap - small_text_.height()) / 2.0;
             text_.draw(cr, row_x, top);
-            set_source(cr, cfg::subtitle);
+            set_source(cr, palette::text_alpha65);
             small_text_.draw(cr, row_x, top + text_.height() + cfg::two_line_gap);
         }
 
@@ -571,7 +571,7 @@ void Launcher::paint() {
         if (selected_ >= 0) {
             stroke_rounded(cr, content_x, list_top + (selected_ - first) * cfg::row_pitch, row_w,
                            cfg::row_height, metrics::radius_sm, cfg::highlight_border_width,
-                           cfg::selection);
+                           palette::accent_alt_alpha50);
         }
         cairo_restore(cr);
     }

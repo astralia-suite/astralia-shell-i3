@@ -29,7 +29,6 @@ inline constexpr int pill_spacing = 6;
 // Dividers
 inline constexpr double divider_height_ratio = 0.4;
 inline constexpr double divider_width = 1.0;
-inline constexpr Color divider = palette::text_alpha20;
 
 // Control center
 inline constexpr int control_center_row_height = 40;
@@ -38,7 +37,15 @@ inline constexpr int control_center_gap = 12;
 inline constexpr int control_center_wheel_step = 5;
 inline constexpr const char *control_center_percent_sample = "muted";
 
-// Status panels
+// Panels
+inline constexpr int panel_width = 360;
+inline constexpr int panel_max_height = 560;
+inline constexpr int panel_row_height = 46;
+inline constexpr int panel_section_height = 26;
+inline constexpr int panel_slider_height = 32;
+inline constexpr int panel_empty_height = 60;
+inline constexpr int panel_card_gap = 8;
+inline constexpr int panel_scroll_step = 40;
 inline constexpr int panel_top = 2 * margin_top + height;
 inline constexpr int panel_percent_width = 56;
 inline constexpr int panel_volume_step = 5;
@@ -51,19 +58,14 @@ inline constexpr int panel_echo_row_height = 40;
 inline constexpr const char *font = "Comic Shanns Mono 15";
 inline constexpr const char *icon_font = "tabler-icons 17";
 
-// Colors
-inline constexpr Color background = {palette::base.r, palette::base.g, palette::base.b, 0.8f};
-inline constexpr Color border = palette::accent;
-inline constexpr Color foreground = palette::text;
-inline constexpr Color pill_active = palette::accent_alt;
-inline constexpr Color pill_occupied = palette::accent;
-inline constexpr Color pill_inactive = palette::text_alpha20;
-
 // Content
 inline constexpr const char *clock_format = "%a %Y-%m-%d %H:%M:%S";
 inline constexpr const char *logout_label = "Logout";
 inline constexpr const char *bluetooth_idle_label = "Idle";
 inline constexpr const char *bluetooth_disabled_label = "Disabled";
+
+// Timing
+inline constexpr std::chrono::milliseconds panel_close_linger{50};
 
 // Memory
 inline constexpr std::chrono::milliseconds trim_interval = std::chrono::minutes(1);

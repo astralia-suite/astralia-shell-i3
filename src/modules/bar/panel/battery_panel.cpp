@@ -2,7 +2,6 @@
 #include <format>
 
 #include "config/bar_config.h"
-#include "config/panel_config.h"
 
 #include "modules/bar/panel/battery_panel.h"
 
@@ -28,7 +27,7 @@ std::string battery_state_label(const BatteryStatus &status) {
 
 BatteryPanel::BatteryPanel(XConnection &x, EventLoop &loop, BatteryService &battery)
     : battery_(battery),
-      window_(x, loop, "astralia-battery-panel", panel_config::width, panel_config::max_height, [this](const xcb_generic_event_t &event) { handle(event); }, nullptr) {
+      window_(x, loop, "astralia-battery-panel", bar_config::panel_width, bar_config::panel_max_height, [this](const xcb_generic_event_t &event) { handle(event); }, nullptr) {
     battery_.changed.connect([this] {
         if (window_.is_open()) {
             paint();
@@ -75,7 +74,7 @@ void BatteryPanel::paint() {
     constexpr double bar_h = panel_config::track_height + 2;
     const BatteryStatus &status = battery_.status();
     double top = panel_content_top();
-    double content = status.present ? label + panel_config::row_gap + bar_h : panel_config::empty_height;
+    double content = status.present ? label + panel_config::row_gap + bar_h : bar_config::panel_empty_height;
     int height = static_cast<int>(top + content + pad);
     window_.set_height(height);
 
@@ -94,7 +93,7 @@ void BatteryPanel::paint() {
                         : status.percent <= 15         ? palette::critical
                         : status.percent <= 30         ? palette::warn
                                                        : palette::text_muted;
-    int title_w = panel_draw_text(cr, panel_config::font, "Battery", pad, top, label, 0, bar_config::foreground);
+    int title_w = panel_draw_text(cr, panel_config::font, "Battery", pad, top, label, 0, palette::text);
     double state_x = pad + title_w + panel_config::row_gap;
     panel_draw_text(cr, panel_config::small_font, battery_state_label(status), state_x, top, label,
                     static_cast<int>(pad + inner - state_x), status.charging ? palette::accent : palette::text_dim);

@@ -32,6 +32,7 @@ class StatusWidget {
                 const AudioLevel &volume, const BatteryStatus &battery);
     std::optional<StatusItem> item_at(int offset) const;
     bool hover(std::optional<int> offset);
+    bool pin(std::optional<StatusItem> item);
     int width() const;
     void draw(cairo_t *cr, double x, int top, int height) const;
 
@@ -45,8 +46,11 @@ class StatusWidget {
         int width(bool show_label) const;
     };
 
+    bool expanded(std::size_t i) const;
+
     std::array<Item, 4> items_;
     std::optional<std::size_t> hovered_;
+    std::optional<std::size_t> pinned_;
 };
 
 } // namespace astralia
