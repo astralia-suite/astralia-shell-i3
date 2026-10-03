@@ -1,8 +1,8 @@
 #include "config/bar_config.h"
 
-#include "core/icons.h"
-
 #include "modules/bar/widget/logout_widget.h"
+
+#include "render/icons.h"
 
 namespace astralia {
 

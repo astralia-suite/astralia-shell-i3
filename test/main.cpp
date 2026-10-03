@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <print>
+#include <set>
 #include <source_location>
 #include <sstream>
 #include <string>
@@ -11,12 +12,12 @@
 #include <vector>
 
 #include "core/cli.h"
-#include "core/icons.h"
 #include "core/ipc.h"
-#include "core/palette.h"
 #include "core/runtime_paths.h"
 
+#include "modules/bar/panel/battery_panel.h"
 #include "modules/bar/panel/control_center_panel.h"
+#include "modules/bar/panel/network_panel.h"
 #include "modules/bar/widget/clock_widget.h"
 #include "modules/bar/widget/status_widget.h"
 #include "modules/bar/widget/workspace_widget.h"
@@ -33,6 +34,10 @@
 #include "modules/polkit/layout.h"
 #include "modules/wallpaper/config_file.h"
 #include "modules/wallpaper/image.h"
+
+#include "render/icons.h"
+#include "render/palette.h"
+#include "render/panel_chrome.h"
 
 #include "service/audio_service.h"
 #include "service/bluetooth_service.h"
@@ -410,6 +415,51 @@ void check_control_center() {
     check(slider_percent_at(10, 200, 500) == 100, "slider clamps right");
 }
 
+void check_network_parse() {
+    using astralia::NetworkMap;
+    std::set<std::string> profiles = astralia::network_parse_profiles(
+        "home:802-11-wireless\nWired connection 1:802-3-ethernet\nlab\\:5G:802-11-wireless\n");
+    check(profiles == std::set<std::string>{"home", "lab:5G"}, "profiles keep Wi-Fi only and unescape colons");
+    NetworkMap networks = astralia::network_parse_networks(
+        "home:WPA2 WPA3:82:*\ncafe::40: \nlab\\:5G:WPA2:60: \ncafe:WPA2:90: \n:WPA2:30: \n", profiles);
+    check(networks.size() == 3, "hidden SSIDs drop and duplicates merge");
+    check(networks["home"].connected && networks["home"].existing && networks["home"].security == "WPA2/WPA3",
+          "connected saved network");
+    check(networks["cafe"].security == "--" && networks["cafe"].signal == 40 && !networks["cafe"].existing,
+          "first duplicate wins; open network shows --");
+    check(networks["lab:5G"].in_range && networks["lab:5G"].existing, "escaped SSID matches its profile");
+    NetworkMap out_of_range = astralia::network_parse_networks("", {"office"});
+    check(out_of_range.size() == 1 && !out_of_range["office"].in_range, "profiles out of range stay listed");
+    check(astralia::network_visible_count(out_of_range) == 0, "out-of-range profiles are not visible");
+    check(astralia::network_parse_wifi_device("wlan0:wifi:connected\nlo:loopback:unmanaged\n"), "wifi device found");
+    check(!astralia::network_parse_wifi_device("wlan0:wifi:unmanaged\neth0:ethernet:connected\n"), "unmanaged wifi ignored");
+    NetworkMap self_only = astralia::network_parse_networks("home:WPA2:80:*\n", {});
+    check(astralia::network_scan_would_collapse(networks, self_only), "a self-only rescan is discarded");
+    check(!astralia::network_scan_would_collapse(self_only, networks), "a fuller rescan is kept");
+}
+
+void check_status_panels() {
+    using astralia::panel_clamp_scroll;
+    check(panel_clamp_scroll(-10, 500, 200) == 0, "scroll clamps at the top");
+    check(panel_clamp_scroll(400, 500, 200) == 300, "scroll clamps at the bottom");
+    check(panel_clamp_scroll(50, 100, 200) == 0, "short content never scrolls");
+    astralia::PanelRect a{0, 0, 100, 100};
+    astralia::PanelRect clipped = astralia::panel_intersect(a, {50, 80, 100, 100});
+    check(clipped.x == 50 && clipped.y == 80 && clipped.w == 50 && clipped.h == 20, "hit rects clip to the list");
+    check(astralia::panel_intersect(a, {200, 0, 10, 10}).w == 0, "disjoint rects do not hit");
+    check(astralia::network_signal_icon(80) == astralia::icon::wifi, "strong signal icon");
+    check(astralia::network_signal_icon(10) == astralia::icon::wifi0, "weak signal icon");
+    check(astralia::battery_time_left(0).empty(), "unknown time is blank");
+    check(astralia::battery_time_left(45 * 60) == "45m", "minutes only");
+    check(astralia::battery_time_left(2 * 3600 + 5 * 60) == "2h 5m", "hours and minutes");
+    check(astralia::battery_state_label({true, 40, true, false, false, 3600}) == "Charging \xE2\x80\x94 1h 0m to full",
+          "charging label");
+    check(astralia::battery_state_label({true, 40, false, false, false, 600}) == "Discharging \xE2\x80\x94 10m left",
+          "discharging label");
+    check(astralia::battery_state_label({true, 80, false, false, true, 0}) == "Not charging", "pending label");
+    check(astralia::battery_state_label({true, 100, false, true, false, 0}) == "Full", "full label");
+}
+
 int main() {
     check_ms_until_next_second();
     check_parse_invocation();
@@ -432,6 +482,8 @@ int main() {
     check_notification_layout();
     check_status_changes();
     check_control_center();
+    check_network_parse();
+    check_status_panels();
     if (failures > 0) {
         std::println(stderr, "{} check(s) failed", failures);
         return EXIT_FAILURE;

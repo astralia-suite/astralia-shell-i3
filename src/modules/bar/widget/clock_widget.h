@@ -3,7 +3,7 @@
 #include <cairo.h>
 #include <chrono>
 
-#include "core/text.h"
+#include "render/text.h"
 
 namespace astralia {
 

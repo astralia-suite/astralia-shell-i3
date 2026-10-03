@@ -3,7 +3,7 @@
 #include <expected>
 #include <string>
 
-#include "core/image_decode.h"
+#include "render/image_decode.h"
 
 namespace astralia {
 

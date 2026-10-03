@@ -41,6 +41,7 @@ class XConnection {
     xcb_atom_t atom(std::string_view name);
     OutputGeometry primary_output() const;
     std::vector<Output> outputs() const;
+    OutputGeometry pointer_output() const;
 
   private:
     struct Disconnect {

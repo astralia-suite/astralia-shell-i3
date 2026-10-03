@@ -2,7 +2,7 @@
 
 #include <chrono>
 
-#include "core/palette.h"
+#include "render/palette.h"
 
 namespace astralia::notification_config {
 

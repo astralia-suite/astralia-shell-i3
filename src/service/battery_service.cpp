@@ -15,6 +15,7 @@ const std::string device_interface = "org.freedesktop.UPower.Device";
 // UPower device states
 constexpr uint32_t state_charging = 1;
 constexpr uint32_t state_fully_charged = 4;
+constexpr uint32_t state_pending_charge = 5;
 
 } // namespace
 
@@ -45,6 +46,10 @@ bool BatteryService::refresh() {
             dbus_property<uint32_t>(device_.get(), device_interface, "State").value_or(0);
         next.charging = state == state_charging;
         next.full = state == state_fully_charged;
+        next.pending = state == state_pending_charge;
+        const char *time = next.charging ? "TimeToFull" : "TimeToEmpty";
+        next.seconds_left = static_cast<int>(
+            dbus_property<int64_t>(device_.get(), device_interface, time).value_or(0));
     }
     if (next == status_) {
         return false;

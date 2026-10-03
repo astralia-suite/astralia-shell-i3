@@ -1,9 +1,10 @@
 #pragma once
 
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 
-#include "core/palette.h"
+#include "render/palette.h"
 
 namespace astralia::bar_config {
 
@@ -31,16 +32,20 @@ inline constexpr double divider_width = 1.0;
 inline constexpr Color divider = palette::text_alpha20;
 
 // Control center
-inline constexpr int control_center_width = 320;
-inline constexpr int control_center_padding = 16;
 inline constexpr int control_center_row_height = 40;
-inline constexpr int control_center_track_height = 6;
 inline constexpr int control_center_icon_slot = 28;
 inline constexpr int control_center_gap = 12;
 inline constexpr int control_center_wheel_step = 5;
 inline constexpr const char *control_center_percent_sample = "muted";
-inline constexpr Color control_center_track = palette::text_alpha20;
-inline constexpr Color control_center_fill = palette::accent;
+
+// Status panels
+inline constexpr int panel_top = 2 * margin_top + height;
+inline constexpr int panel_percent_width = 56;
+inline constexpr int panel_volume_step = 5;
+inline constexpr std::size_t panel_password_min = 8;
+inline constexpr const char *panel_echo_file = "electro.png";
+inline constexpr int panel_echo_size = 20;
+inline constexpr int panel_echo_row_height = 40;
 
 // Typography
 inline constexpr const char *font = "Comic Shanns Mono 15";

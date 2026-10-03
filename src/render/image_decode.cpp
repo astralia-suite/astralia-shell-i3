@@ -9,7 +9,7 @@
 #define STBI_NO_LINEAR
 #include <stb/stb_image.h>
 
-#include "core/image_decode.h"
+#include "render/image_decode.h"
 
 namespace astralia {
 

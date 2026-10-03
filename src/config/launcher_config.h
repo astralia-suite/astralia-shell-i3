@@ -6,7 +6,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "core/palette.h"
+#include "render/palette.h"
 
 namespace astralia {
 

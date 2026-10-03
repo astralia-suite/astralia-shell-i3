@@ -6,7 +6,7 @@
 #include <optional>
 #include <string>
 
-#include "core/text.h"
+#include "render/text.h"
 
 #include "service/audio_service.h"
 #include "service/battery_service.h"
@@ -21,10 +21,16 @@ const char *network_icon(const NetworkStatus &status);
 const char *battery_icon(const BatteryStatus &status);
 std::string battery_label(const BatteryStatus &status);
 
+enum class StatusItem : std::size_t { bluetooth,
+                                      network,
+                                      volume,
+                                      battery };
+
 class StatusWidget {
   public:
     void update(const BluetoothStatus &bluetooth, const NetworkStatus &network,
                 const AudioLevel &volume, const BatteryStatus &battery);
+    std::optional<StatusItem> item_at(int offset) const;
     bool hover(std::optional<int> offset);
     int width() const;
     void draw(cairo_t *cr, double x, int top, int height) const;

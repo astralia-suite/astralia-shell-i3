@@ -2,9 +2,9 @@
 
 #include "config/bar_config.h"
 
-#include "core/icons.h"
-
 #include "modules/bar/widget/status_widget.h"
+
+#include "render/icons.h"
 
 namespace astralia {
 
@@ -101,20 +101,26 @@ void StatusWidget::update(const BluetoothStatus &bluetooth, const NetworkStatus 
     battery_item.label.set(battery.present ? battery_label(battery) : "");
 }
 
-bool StatusWidget::hover(std::optional<int> offset) {
-    std::optional<std::size_t> next;
+std::optional<StatusItem> StatusWidget::item_at(int offset) const {
     int start = 0;
-    for (std::size_t i = 0; offset && i < items_.size(); ++i) {
+    for (std::size_t i = 0; i < items_.size(); ++i) {
         if (!items_[i].visible) {
             continue;
         }
         int end = start + items_[i].width(i == hovered_) + bar_config::item_gap;
-        if (*offset >= start - bar_config::item_gap / 2 &&
-            *offset < end - bar_config::item_gap / 2) {
-            next = i;
-            break;
+        if (offset >= start - bar_config::item_gap / 2 && offset < end - bar_config::item_gap / 2) {
+            return static_cast<StatusItem>(i);
         }
         start = end;
+    }
+    return std::nullopt;
+}
+
+bool StatusWidget::hover(std::optional<int> offset) {
+    std::optional<StatusItem> item = offset ? item_at(*offset) : std::nullopt;
+    std::optional<std::size_t> next;
+    if (item) {
+        next = static_cast<std::size_t>(*item);
     }
     if (next == hovered_) {
         return false;

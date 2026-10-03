@@ -41,3 +41,5 @@ Drop an entry once newer knowledge fully supersedes it.
 - Wipe password buffers with `explicit_bzero` after responding or cancelling. `std::string::clear` leaves the bytes in the heap.
 - Hold one sdbus proxy per fixed object; keep changing NetworkManager paths one-off. Caching per-reconnect paths would grow without bound.
 - Call `EventLoop::reschedule()` after an event moves a timer's next deadline earlier. Deadlines are recomputed only after firing, so idle timers ignore new work.
+- Never destroy an sdbus proxy inside its own async reply callback. Prune per-device proxies from the signal-match handler instead.
+- A detached reader thread must own what it touches through a `shared_ptr`. The owning object may be destroyed before the child exits.

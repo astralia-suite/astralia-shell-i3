@@ -18,9 +18,10 @@
 
 - `src/main.cpp`: creates `core` objects, the shared `Services` and modules, runs the event loop; nothing else.
 - `src/app/`: process-wide shared state (`Services`); includes `core/` and `service/`, never `modules/`.
-- `src/core/`: shared infrastructure (X connection, event loop, rendering helpers, logging); includes nothing from `modules/` or `service/`.
-- `src/modules/`: user-facing shell parts (bar, launcher, …).
-- `src/config/`: per-module constants and plain data types.
+- `src/core/`: non-visual infrastructure (X connection, event loop, D-Bus, processes, IPC, logging); includes nothing from `render/`, `modules/` or `service/`.
+- `src/render/`: every visual building block shared by modules (text, icons, palette, fonts, image decoding, cairo helpers, `XWindow`, panel chrome and window); includes `core/` and `config/`, never `modules/` or `service/`.
+- `src/modules/`: user-facing shell parts (bar, launcher, …); module-exclusive code only, anything two modules could share belongs in `render/` or `core/`.
+- `src/config/`: per-module constants and plain data types, plus `panel_config.h` for `render/`'s panel chrome.
 - `src/service/`: data providers shared by modules (workspaces, windows, …).
 - `src/plugin/`: optional `dlopen`-loaded code.
 - `test/`: tests for `src/` code, built as `astralia-shell-test`.

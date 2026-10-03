@@ -50,21 +50,18 @@
 - `ipc.{h,cpp}`: Unix socket `IpcServer` with verb handlers (built-in `help`, `kill`), in-process `dispatch()`, `format_help()`, and `run_ipc_client()`.
 - `unique_fd.h`: Move-only RAII file descriptor.
 - `log.{h,cpp}`: `log::info` and `log::error` formatted messages to stderr.
-- `x_connection.{h,cpp}`: RAII xcb connection (syncs before disconnect, cairo MIT-SHM disabled) with screen, root and ARGB visuals, EWMH, atoms, RandR outputs.
+- `x_connection.{h,cpp}`: RAII xcb connection (syncs before disconnect, cairo MIT-SHM disabled) with screen, root and ARGB visuals, EWMH, atoms, RandR outputs, `pointer_output()` (the output under the pointer, primary as fallback).
 - `event_loop.{h,cpp}`: `poll()` loop over X, `signalfd`, a `CLOCK_BOOTTIME` `timerfd`, extra fds and prepare/dispatch poll sources; window and event-type handlers, timers with `reschedule()`, `stop()`.
-- `text.{h,cpp}`: Cached `PangoLayout` with a fixed font; set text, optional word wrap or end ellipsis, measure pixel size, draw (vertically centered, ink centered or ink left-aligned and vertically centered) on cairo.
 - `keyboard.{h,cpp}`: xkbcommon-x11 keymap; translates key presses, with modifiers from the event, to text, backspace, arrows, enter, escape.
+- `async_process.{h,cpp}`: `AsyncProcess`: `posix_spawnp` child with captured stdout (optionally stderr), read to EOF on a detached thread; an `eventfd` on the `EventLoop` delivers the output to a main-thread callback; restart or cancel kills and drops the stale result.
 - `spawn.{h,cpp}`: `spawn_detached()`: double-forked `sh -c` with an empty signal mask and default `SIGPIPE`.
 - `signal.h`: `Signal<Args...>` subscriber list; services expose it, modules `connect()`, services `emit()`.
-- `palette.h`: `Color`, `constexpr` `color("#hex")` parser, shared `palette::` colors and `metrics::` radii/borders.
-- `icons.h`: `icon::` Tabler glyph codepoints as UTF-8 strings; `volume_threshold()` and `brightness_threshold()` level icons, as in `hl`.
-- `app_fonts.{h,cpp}`: Idempotent `register_app_fonts()` adds the icon, text and Yuji Mai fonts to fontconfig from the install or source dir.
-- `image_decode.{h,cpp}`: `SurfacePtr` and `decode_image()`: `stb_image` rasters or `resvg` SVGs into premultiplied cairo surfaces, optionally fit to a size.
 - `dbus.{h,cpp}`: `SystemBus` sdbus-c++ system or session (`BusKind`) connection driven by `EventLoop` fds, `add_match()`, `proxy()`, and `dbus_property<T>()` via proxy or path.
 
 ## `src/config/`
 
-- `bar_config.h`: Bar geometry, corner radius, padding, border, pill sizes, divider and control center sizes, fonts, colors, `strftime` clock format and `malloc_trim` interval.
+- `bar_config.h`: Bar geometry, corner radius, padding, border, pill sizes, divider and control center sizes, status panel placement and bar-only panel values (volume step, password minimum, `electro.png` echo), fonts, colors, `strftime` clock format and `malloc_trim` interval.
+- `panel_config.h`: `render/` panel chrome geometry, fonts and colors shared by every panel.
 - `logout_config.h`: Logout button ring geometry, Yuji Mai glyph font, colors, logo file and the 8-entry glyph/command action table.
 - `launcher_config.h`: Launcher geometry, fonts, colors, launch commands, search limits, and result, submenu and visit plain types.
 - `polkit_config.h`: Polkit card geometry, line heights, fonts, colors, prompt texts and echo glyph file.
@@ -74,7 +71,7 @@
 
 ## `src/modules/`
 
-- `bar.{h,cpp}`: Top dock with inset pill-shaped panel, EWMH hints and strut; subscribes to shared i3, network, Bluetooth and battery services; logout and workspaces left, clock center, status and control center right, 1 px dividers between widget groups; logout click dispatches `logout` IPC, control center click toggles its panel; sends status-change `Notify` on the session bus; periodic `malloc_trim`.
+- `bar.{h,cpp}`: Top dock with inset pill-shaped panel, EWMH hints and strut; subscribes to shared i3, network, Bluetooth and battery services; logout and workspaces left, clock center, status and control center right, 1 px dividers between widget groups; logout click dispatches `logout` IPC, control center click toggles its panel, Bluetooth, network, volume and battery status items toggle their panels; sends status-change `Notify` on the session bus; periodic `malloc_trim`.
 - `launcher.{h,cpp}`: `launcher` / `launcher global` IPC toggle; override-redirect overlay on the pointer's output; takes input focus, closes on focus loss; `malloc_trim` on close.
 - `logout.{h,cpp}`: `logout` IPC toggle; override-redirect overlay on the pointer's output with 8 glyph buttons around the logo; keys, hover, click run actions.
 - `notification.{h,cpp}`: Subscribes to the shared `NotificationService`; unfocusable override-redirect card stack at the pointer output's bottom right; top-right x dismisses a card.
@@ -88,11 +85,27 @@
 - `clock_widget.{h,cpp}`: Local date and time text (`Mon 1970-01-01 00:00:00`) and `ms_until_next_second()` for per-second redraws.
 - `logout_widget.{h,cpp}`: `icon::power` button with a `Logout` label shown only while hovered.
 - `workspace_widget.{h,cpp}`: Pill row (active wider, accent), `workspace_row_width()` and click hit-test `workspace_at()`.
-- `status_widget.{h,cpp}`: Bluetooth, network and battery icons; device, `Idle` or `Disabled`, SSID, percent or `Plugged in` label shown only while hovered; pure selection functions.
+- `status_widget.{h,cpp}`: Bluetooth, network, volume and battery icons; `item_at()` maps an x offset to a `StatusItem`; device, `Idle` or `Disabled`, SSID, percent or `Plugged in` label shown only while hovered; pure selection functions.
+
+## `src/render/`
+
+- `text.{h,cpp}`: Cached `PangoLayout` with a fixed font; set text, optional word wrap or end ellipsis, measure pixel size, draw (vertically centered, ink centered or ink left-aligned and vertically centered) on cairo.
+- `palette.h`: `Color`, `constexpr` `color("#hex")` parser, shared `palette::` colors and `metrics::` radii/borders.
+- `icons.h`: `icon::` Tabler glyph codepoints as UTF-8 strings; `volume_threshold()` and `brightness_threshold()` level icons, as in `hl`.
+- `app_fonts.{h,cpp}`: Idempotent `register_app_fonts()` adds the icon, text and Yuji Mai fonts to fontconfig from the install or source dir.
+- `image_decode.{h,cpp}`: `SurfacePtr` and `decode_image()`: `stb_image` rasters or `resvg` SVGs into premultiplied cairo surfaces, optionally fit to a size.
+- `draw.{h,cpp}`: `set_source()` and `rounded_rect()` cairo helpers shared by every module.
+- `x_window.{h,cpp}`: `XWindow`: 32-bit (or root-depth fallback) window with own colormap, name and class, GC, lazily sized pixmap and cairo context (`place()`, `release()`), raise/map with optional focus take (`show()`, `focus()`), unmap with focus restore (`hide()`), `clear()`, `present()`; optional override-redirect.
+- `panel_chrome.{h,cpp}`: Shared panel drawing on cairo: card, header with close button, toggle, slider, icon button, section label, device row, centered message, confirm card; `PanelRect`/`PanelHit` click regions; pure `slider_percent_at()`, `panel_clamp_scroll()`, `panel_intersect()`, `panel_hit_at()`.
+- `panel_window.{h,cpp}`: `PanelWindow` on an `XWindow`: placed by `open(right_margin, top)` on the primary output, takes focus, closes on focus loss, height up to a fixed max, pixmap allocated on first paint and freed on close, owner gets the remaining events.
 
 ## `src/modules/bar/panel/`
 
-- `control_center_panel.{h,cpp}`: Override-redirect card under the bar's right end; brightness and volume sliders (click, drag, wheel) following live service changes, `Escape` or focus loss closes; `slider_percent_at()`.
+- `control_center_panel.{h,cpp}`: Panel-width card with `Control Center` header, brightness and volume sliders (click, drag, wheel) on a `PanelWindow`, following live service changes.
+- `audio_panel.{h,cpp}`: Output and input sliders, per-application playback sliders, output and input device lists (click sets the default); drag, wheel and `Left`/`Right` step volume; mute buttons.
+- `battery_panel.{h,cpp}`: UPower display-device row: state, time to full or empty, colored charge bar and percent; `No battery detected` otherwise; pure `battery_time_left()`, `battery_state_label()`.
+- `bluetooth_panel.{h,cpp}`: Power toggle, Connected / Paired / Nearby device rows; click connects, pairs or asks to disconnect, forget button asks to forget; discovery runs while open.
+- `network_panel.{h,cpp}`: Wi-Fi toggle, rescan button, error banner, Connected / Known / Available rows sorted by signal; password card for new secured networks echoing typed characters as `electro.png` glyphs, confirm cards for disconnect and forget; scanning runs while open; `network_signal_icon()`.
 
 ## `src/modules/launcher/`
 
@@ -126,13 +139,13 @@
 ## `src/service/`
 
 - `i3_service.{h,cpp}`: i3 workspace numbers, occupied and current from EWMH root property events; `switch_to()` via the i3 IPC socket.
-- `bluetooth_service.{h,cpp}`: BlueZ `GetManagedObjects` on a held root proxy: adapter present, powered, first connected device alias; refreshes on `org.bluez` signals; `bluetooth_changes()` connect/disconnect messages.
-- `network_service.{h,cpp}`: NetworkManager type, captive portal, Wi-Fi strength and SSID via a held manager proxy; refreshes on `PropertiesChanged`; `network_changes()` connect/disconnect/portal messages.
+- `bluetooth_service.{h,cpp}`: BlueZ `GetManagedObjects` on a held root proxy: adapter present, powered, first connected device alias, device list with battery; async `Powered`, discovery, `Connect`, `Disconnect`, `Pair`, `RemoveDevice` through per-device proxies pruned from the signal handler; refreshes on `org.bluez` signals; `bluetooth_changes()` connect/disconnect messages.
+- `network_service.{h,cpp}`: NetworkManager type, captive portal, Wi-Fi strength, SSID and `WirelessEnabled` via a held manager proxy; refreshes on `PropertiesChanged`; `nmcli` via `AsyncProcess` (port of `hl`) for the Wi-Fi list, connect, disconnect and forget, with a profiles → quick list → rescan chain repeating only between `start_watch()` and `stop_watch()`; pure `nmcli` parsers; `network_changes()` connect/disconnect/portal messages.
 - `polkit_service.{h,cpp}`: Polkit authentication agent on the session; drives the default `GMainContext` via an `EventLoop` poll source; request, response and info state.
 - `notification_service.{h,cpp}`: `org.freedesktop.Notifications` server on the session bus; FIFO list expiring each entry after `hang_time`.
 - `brightness_service.{h,cpp}`: First `/sys/class/backlight` device percent, `inotify` change signal; `set()` via `brightnessctl`.
-- `audio_service.{h,cpp}`: `libpipewire` default sink/source level and mute on the `EventLoop`; route-or-node `set_sink_volume()`; pure `audio_percent()`.
-- `battery_service.{h,cpp}`: UPower `DisplayDevice` presence, percent, charging and full state via a held proxy; refreshes on its signals.
+- `audio_service.{h,cpp}`: `libpipewire` sinks, sources and playback/capture streams with level and mute on the `EventLoop`; route-or-node `set_volume()`/`set_mute()`, `set_default()` via default metadata; `AudioKind::nodes` on any node change; pure `audio_percent()`.
+- `battery_service.{h,cpp}`: UPower `DisplayDevice` presence, percent, charging, full and pending state, `TimeToFull`/`TimeToEmpty` via a held proxy; refreshes on its signals.
 
 ## `test/`
 

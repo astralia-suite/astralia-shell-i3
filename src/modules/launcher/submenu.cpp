@@ -1,7 +1,7 @@
-#include "core/icons.h"
-
 #include "modules/launcher/files_provider.h"
 #include "modules/launcher/submenu.h"
+
+#include "render/icons.h"
 
 namespace astralia {
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/palette.h"
+#include "render/palette.h"
 
 namespace astralia::polkit_config {
 

@@ -1,7 +1,9 @@
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <initializer_list>
 #include <pipewire/extensions/metadata.h>
 #include <pipewire/keys.h>
 #include <pipewire/pipewire.h>
@@ -81,6 +83,8 @@ struct AudioService::Impl {
         pw_proxy *proxy = nullptr;
         spa_hook listener{};
         std::string name;
+        std::string label;
+        AudioNodeKind kind = AudioNodeKind::sink;
         bool is_sink = false;
         uint32_t channels = 2;
         int percent = 0;
@@ -104,16 +108,22 @@ struct AudioService::Impl {
     uint32_t source_id = 0;
     bool sink_changed = false;
     bool source_changed = false;
+    bool nodes_changed = false;
 
     void mark(uint32_t id) {
         if (id == 0) {
             return;
         }
+        nodes_changed = true;
         if (id == sink_id) {
             sink_changed = true;
         } else if (id == source_id) {
             source_changed = true;
         }
+    }
+
+    static bool is_device(const Node &node) {
+        return node.kind == AudioNodeKind::sink || node.kind == AudioNodeKind::source;
     }
 
     AudioLevel level(uint32_t id) const {
@@ -218,7 +228,7 @@ struct AudioService::Impl {
         std::string name = json_name(value);
         uint32_t resolved = 0;
         for (const auto &[id, node] : impl->nodes) {
-            if (node.name == name && node.is_sink == sink) {
+            if (is_device(node) && node.name == name && node.is_sink == sink) {
                 resolved = id;
                 break;
             }
@@ -232,6 +242,7 @@ struct AudioService::Impl {
             impl->source_id = resolved;
             impl->source_changed = true;
         }
+        impl->nodes_changed = true;
         return 0;
     }
 
@@ -240,19 +251,42 @@ struct AudioService::Impl {
         auto *impl = static_cast<Impl *>(data);
         if (std::strcmp(type, PW_TYPE_INTERFACE_Node) == 0) {
             const char *media_class = lookup(props, SPA_KEY_MEDIA_CLASS);
-            bool sink = media_class != nullptr && std::strcmp(media_class, "Audio/Sink") == 0;
-            bool source = media_class != nullptr && std::strcmp(media_class, "Audio/Source") == 0;
-            if (!sink && !source) {
+            std::string_view kind_name = media_class != nullptr ? media_class : "";
+            AudioNodeKind kind;
+            if (kind_name == "Audio/Sink") {
+                kind = AudioNodeKind::sink;
+            } else if (kind_name == "Audio/Source") {
+                kind = AudioNodeKind::source;
+            } else if (kind_name == "Stream/Output/Audio") {
+                kind = AudioNodeKind::playback;
+            } else if (kind_name == "Stream/Input/Audio") {
+                kind = AudioNodeKind::capture;
+            } else {
                 return;
             }
+            bool sink = kind == AudioNodeKind::sink;
+            bool source = kind == AudioNodeKind::source;
             const char *name = lookup(props, SPA_KEY_NODE_NAME);
             const char *device_id = lookup(props, PW_KEY_DEVICE_ID);
             const char *profile_device = lookup(props, "card.profile.device");
+            auto first = [props](std::initializer_list<const char *> keys) {
+                for (const char *key : keys) {
+                    const char *value = lookup(props, key);
+                    if (value != nullptr && *value != '\0') {
+                        return value;
+                    }
+                }
+                return "Unknown";
+            };
             Node &node = impl->nodes[id];
             node.impl = impl;
             node.id = id;
+            node.kind = kind;
             node.is_sink = sink;
             node.name = name != nullptr ? name : "";
+            node.label = sink || source ? first({PW_KEY_NODE_DESCRIPTION, SPA_KEY_NODE_NAME})
+                                        : first({PW_KEY_APP_NAME, PW_KEY_NODE_DESCRIPTION, PW_KEY_MEDIA_NAME, SPA_KEY_NODE_NAME});
+            impl->nodes_changed = true;
             node.device_id = device_id != nullptr ? std::strtoul(device_id, nullptr, 10) : 0;
             node.card_profile_device = profile_device != nullptr ? std::atoi(profile_device) : -1;
             node.proxy = static_cast<pw_proxy *>(
@@ -308,6 +342,7 @@ struct AudioService::Impl {
         spa_hook_remove(&it->second.listener);
         pw_proxy_destroy(it->second.proxy);
         impl->nodes.erase(it);
+        impl->nodes_changed = true;
     }
 
     static constexpr pw_node_events node_events = {
@@ -382,6 +417,18 @@ struct AudioService::Impl {
         set_props(it->second, builder, props);
     }
 
+    void set_default(uint32_t id) {
+        auto it = nodes.find(id);
+        if (it == nodes.end() || !is_device(it->second) || metadata == nullptr) {
+            return;
+        }
+        const char *key = it->second.is_sink ? "default.configured.audio.sink"
+                                             : "default.configured.audio.source";
+        std::string json = "{ \"name\": \"" + it->second.name + "\" }";
+        pw_metadata_set_property(reinterpret_cast<pw_metadata *>(metadata), PW_ID_CORE, key,
+                                 "Spa:String:JSON", json.c_str());
+    }
+
     void set_props(Node &node, spa_pod_builder &builder, spa_pod *props) {
         auto device = devices.find(node.device_id);
         if (node.card_profile_device >= 0 && device != devices.end()) {
@@ -443,6 +490,9 @@ AudioService::AudioService(EventLoop &loop) : loop_(loop), impl_(std::make_uniqu
         if (std::exchange(impl_->source_changed, false)) {
             changed.emit(AudioKind::source);
         }
+        if (std::exchange(impl_->nodes_changed, false)) {
+            changed.emit(AudioKind::nodes);
+        }
     });
 }
 
@@ -456,6 +506,30 @@ AudioLevel AudioService::sink() const { return impl_->level(impl_->sink_id); }
 
 AudioLevel AudioService::source() const { return impl_->level(impl_->source_id); }
 
+uint32_t AudioService::sink_id() const { return impl_->sink_id; }
+
+uint32_t AudioService::source_id() const { return impl_->source_id; }
+
+std::vector<AudioNode> AudioService::nodes(AudioNodeKind kind) const {
+    std::vector<AudioNode> out;
+    for (const auto &[id, node] : impl_->nodes) {
+        if (node.kind == kind) {
+            out.push_back({id, node.kind, node.label, node.percent, node.muted});
+        }
+    }
+    std::ranges::sort(out, {}, &AudioNode::id);
+    return out;
+}
+
+std::optional<AudioNode> AudioService::node(uint32_t id) const {
+    auto it = impl_->nodes.find(id);
+    if (it == impl_->nodes.end()) {
+        return std::nullopt;
+    }
+    const Impl::Node &node = it->second;
+    return AudioNode{id, node.kind, node.label, node.percent, node.muted};
+}
+
 void AudioService::set_sink_volume(int percent) {
     impl_->set_volume(impl_->sink_id, percent);
 }
@@ -463,5 +537,11 @@ void AudioService::set_sink_volume(int percent) {
 void AudioService::set_sink_mute(bool muted) {
     impl_->set_mute(impl_->sink_id, muted);
 }
+
+void AudioService::set_volume(uint32_t id, int percent) { impl_->set_volume(id, percent); }
+
+void AudioService::set_mute(uint32_t id, bool muted) { impl_->set_mute(id, muted); }
+
+void AudioService::set_default(uint32_t id) { impl_->set_default(id); }
 
 } // namespace astralia

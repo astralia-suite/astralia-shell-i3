@@ -14,12 +14,18 @@
 #include "core/ipc.h"
 #include "core/x_connection.h"
 
+#include "render/x_window.h"
+
 namespace astralia {
 
+class AudioPanel;
+class BatteryPanel;
+class BluetoothPanel;
 class ClockWidget;
 class ControlCenterPanel;
 class ControlCenterWidget;
 class LogoutWidget;
+class NetworkPanel;
 class StatusWidget;
 
 class Bar {
@@ -48,7 +54,6 @@ class Bar {
     void redraw_clock();
     void redraw_status();
     void notify(const std::string &app, const StatusMessage &message);
-    void present(const Rect &rect);
     void click(const xcb_button_press_event_t &event);
     void hover(std::optional<int> x);
     Rect clock_rect() const;
@@ -59,18 +64,17 @@ class Bar {
     uint16_t width_;
     uint16_t height_;
     Rect panel_{};
-    xcb_colormap_t colormap_;
-    xcb_window_t window_;
-    xcb_pixmap_t pixmap_;
-    xcb_gcontext_t gc_;
-    cairo_surface_t *surface_;
-    cairo_t *cr_;
+    XWindow window_;
     std::unique_ptr<sdbus::IProxy> notifier_;
     std::unique_ptr<ClockWidget> clock_;
     std::unique_ptr<LogoutWidget> logout_;
     std::unique_ptr<StatusWidget> status_;
     std::unique_ptr<ControlCenterWidget> control_center_;
     std::unique_ptr<ControlCenterPanel> control_center_panel_;
+    std::unique_ptr<AudioPanel> audio_panel_;
+    std::unique_ptr<BatteryPanel> battery_panel_;
+    std::unique_ptr<BluetoothPanel> bluetooth_panel_;
+    std::unique_ptr<NetworkPanel> network_panel_;
     Rect clock_rect_{};
     Rect logout_rect_{};
     Rect workspace_rect_{};

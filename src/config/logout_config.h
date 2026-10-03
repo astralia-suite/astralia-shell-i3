@@ -3,7 +3,7 @@
 #include <array>
 #include <numbers>
 
-#include "core/palette.h"
+#include "render/palette.h"
 
 namespace astralia {
 

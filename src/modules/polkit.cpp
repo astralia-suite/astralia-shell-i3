@@ -1,12 +1,6 @@
 #include <algorithm>
-#include <array>
-#include <cairo-xcb.h>
-#include <cstdlib>
 #include <cstring>
 #include <numbers>
-#include <string_view>
-#include <xcb/xcb_ewmh.h>
-#include <xcb/xcb_icccm.h>
 
 #include "config/polkit_config.h"
 
@@ -15,25 +9,13 @@
 #include "modules/polkit.h"
 #include "modules/polkit/layout.h"
 
+#include "render/draw.h"
+
 namespace astralia {
 
 namespace {
 
 namespace cfg = polkit_config;
-
-void set_source(cairo_t *cr, const Color &color) {
-    cairo_set_source_rgba(cr, color.r, color.g, color.b, color.a);
-}
-
-void rounded_rect(cairo_t *cr, double x, double y, double w, double h, double r) {
-    r = std::min({r, w / 2.0, h / 2.0});
-    cairo_new_sub_path(cr);
-    cairo_arc(cr, x + w - r, y + r, r, -std::numbers::pi / 2.0, 0.0);
-    cairo_arc(cr, x + w - r, y + h - r, r, 0.0, std::numbers::pi / 2.0);
-    cairo_arc(cr, x + r, y + h - r, r, std::numbers::pi / 2.0, std::numbers::pi);
-    cairo_arc(cr, x + r, y + r, r, std::numbers::pi, 3.0 * std::numbers::pi / 2.0);
-    cairo_close_path(cr);
-}
 
 void panel(cairo_t *cr, double x, double y, double w, double h, double r, const Color &fill) {
     rounded_rect(cr, x, y, w, h, r);
@@ -69,56 +51,16 @@ SurfacePtr load_echo() {
 } // namespace
 
 Polkit::Polkit(XConnection &x, EventLoop &loop, Services &services)
-    : x_(x), keyboard_(x.conn()), title_(cfg::title_font), message_(cfg::message_font),
+    : x_(x), window_(x, "astralia-polkit", XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_KEY_PRESS),
+      keyboard_(x.conn()), title_(cfg::title_font), message_(cfg::message_font),
       field_(cfg::field_font), info_(cfg::info_font), echo_(load_echo()),
       service_(services.polkit) {
     service_.changed.connect([this] { sync(); });
-    xcb_connection_t *conn = x_.conn();
-    visual_ = x_.argb_visual();
-    depth_ = 32;
-    if (visual_ == nullptr) {
-        visual_ = x_.visual();
-        depth_ = x_.screen()->root_depth;
-    }
-    colormap_ = xcb_generate_id(conn);
-    xcb_create_colormap(conn, XCB_COLORMAP_ALLOC_NONE, colormap_, x_.root(), visual_->visual_id);
-    window_ = xcb_generate_id(conn);
-    std::array<uint32_t, 5> values{XCB_BACK_PIXMAP_NONE, 0, 1,
-                                   XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_BUTTON_PRESS |
-                                       XCB_EVENT_MASK_KEY_PRESS,
-                                   colormap_};
-    OutputGeometry output = x_.primary_output();
-    xcb_create_window(conn, depth_, window_, x_.root(), output.x, output.y, output.width,
-                      output.height, 0, XCB_WINDOW_CLASS_INPUT_OUTPUT, visual_->visual_id,
-                      XCB_CW_BACK_PIXMAP | XCB_CW_BORDER_PIXEL | XCB_CW_OVERRIDE_REDIRECT |
-                          XCB_CW_EVENT_MASK | XCB_CW_COLORMAP,
-                      values.data());
-    using namespace std::string_view_literals;
-    constexpr std::string_view name = "astralia-polkit"sv;
-    constexpr std::string_view wm_class = "astralia-polkit\0astralia-shell\0"sv;
-    xcb_ewmh_set_wm_name(x_.ewmh(), window_, name.size(), name.data());
-    xcb_icccm_set_wm_class(conn, window_, wm_class.size(), wm_class.data());
-    gc_ = xcb_generate_id(conn);
-    uint32_t graphics_exposures = 0;
-    xcb_create_gc(conn, gc_, window_, XCB_GC_GRAPHICS_EXPOSURES, &graphics_exposures);
-    loop.on_window(window_, [this](const xcb_generic_event_t &event) { handle(event); });
+    loop.on_window(window_.id(), [this](const xcb_generic_event_t &event) { handle(event); });
 }
 
 Polkit::~Polkit() {
     clear_password();
-    xcb_connection_t *conn = x_.conn();
-    if (open_) {
-        restore_focus();
-    }
-    if (cr_ != nullptr) {
-        cairo_destroy(cr_);
-        cairo_surface_destroy(surface_);
-        xcb_free_pixmap(conn, pixmap_);
-    }
-    xcb_free_gc(conn, gc_);
-    xcb_destroy_window(conn, window_);
-    xcb_free_colormap(conn, colormap_);
-    xcb_flush(conn);
 }
 
 void Polkit::sync() {
@@ -137,101 +79,22 @@ void Polkit::sync() {
 }
 
 void Polkit::open() {
-    place(pointer_output());
+    window_.place(x_.pointer_output());
     keyboard_.reload();
     open_ = true;
     error_shown_ = false;
     last_error_ = false;
     paint();
-    xcb_connection_t *conn = x_.conn();
-    uint32_t above = XCB_STACK_MODE_ABOVE;
-    xcb_configure_window(conn, window_, XCB_CONFIG_WINDOW_STACK_MODE, &above);
-    xcb_map_window(conn, window_);
-    take_focus();
-    xcb_flush(conn);
+    window_.show(true);
     log::info("polkit: open");
 }
 
 void Polkit::close() {
     clear_password();
-    xcb_connection_t *conn = x_.conn();
-    restore_focus();
-    xcb_unmap_window(conn, window_);
-    xcb_flush(conn);
+    window_.hide();
     open_ = false;
     error_shown_ = false;
     last_error_ = false;
-}
-
-void Polkit::place(const OutputGeometry &output) {
-    xcb_connection_t *conn = x_.conn();
-    if (output.width != geometry_.width || output.height != geometry_.height || cr_ == nullptr) {
-        if (cr_ != nullptr) {
-            cairo_destroy(cr_);
-            cairo_surface_destroy(surface_);
-            xcb_free_pixmap(conn, pixmap_);
-        }
-        pixmap_ = xcb_generate_id(conn);
-        xcb_create_pixmap(conn, depth_, pixmap_, window_, output.width, output.height);
-        surface_ = cairo_xcb_surface_create(conn, pixmap_, visual_, output.width, output.height);
-        cr_ = cairo_create(surface_);
-    }
-    if (output != geometry_) {
-        std::array<uint32_t, 4> values{static_cast<uint32_t>(output.x),
-                                       static_cast<uint32_t>(output.y), output.width,
-                                       output.height};
-        xcb_configure_window(conn, window_,
-                             XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y | XCB_CONFIG_WINDOW_WIDTH |
-                                 XCB_CONFIG_WINDOW_HEIGHT,
-                             values.data());
-    }
-    geometry_ = output;
-}
-
-OutputGeometry Polkit::pointer_output() const {
-    xcb_query_pointer_reply_t *reply =
-        xcb_query_pointer_reply(x_.conn(), xcb_query_pointer(x_.conn(), x_.root()), nullptr);
-    OutputGeometry fallback = x_.primary_output();
-    if (reply == nullptr) {
-        return fallback;
-    }
-    int px = reply->root_x;
-    int py = reply->root_y;
-    free(reply);
-    for (const Output &output : x_.outputs()) {
-        const OutputGeometry &g = output.geometry;
-        if (px >= g.x && px < g.x + g.width && py >= g.y && py < g.y + g.height) {
-            return g;
-        }
-    }
-    return fallback;
-}
-
-void Polkit::take_focus() {
-    xcb_connection_t *conn = x_.conn();
-    xcb_get_input_focus_reply_t *reply =
-        xcb_get_input_focus_reply(conn, xcb_get_input_focus(conn), nullptr);
-    xcb_window_t focus = reply != nullptr ? reply->focus : XCB_NONE;
-    free(reply);
-    if (focus != window_) {
-        previous_focus_ = focus;
-    }
-    xcb_set_input_focus(conn, XCB_INPUT_FOCUS_POINTER_ROOT, window_, XCB_CURRENT_TIME);
-}
-
-void Polkit::restore_focus() {
-    xcb_connection_t *conn = x_.conn();
-    xcb_get_input_focus_reply_t *reply =
-        xcb_get_input_focus_reply(conn, xcb_get_input_focus(conn), nullptr);
-    bool focused = reply != nullptr && reply->focus == window_;
-    free(reply);
-    if (focused) {
-        xcb_window_t target = previous_focus_ != XCB_NONE && previous_focus_ != window_
-                                  ? previous_focus_
-                                  : static_cast<xcb_window_t>(XCB_INPUT_FOCUS_POINTER_ROOT);
-        xcb_set_input_focus(conn, XCB_INPUT_FOCUS_POINTER_ROOT, target, XCB_CURRENT_TIME);
-    }
-    previous_focus_ = XCB_NONE;
 }
 
 void Polkit::handle(const xcb_generic_event_t &event) {
@@ -240,7 +103,7 @@ void Polkit::handle(const xcb_generic_event_t &event) {
     }
     switch (event.response_type & ~0x80) {
     case XCB_EXPOSE:
-        present();
+        window_.present();
         break;
     case XCB_KEY_PRESS: {
         const auto &press = reinterpret_cast<const xcb_key_press_event_t &>(event);
@@ -248,8 +111,7 @@ void Polkit::handle(const xcb_generic_event_t &event) {
         break;
     }
     case XCB_BUTTON_PRESS:
-        take_focus();
-        xcb_flush(x_.conn());
+        window_.focus();
         break;
     default:
         break;
@@ -302,10 +164,10 @@ void Polkit::paint() {
     bool show_info = !info.empty() && !info_error;
 
     double card_h = polkit_card_height(show_info);
-    double card_x = (geometry_.width - cfg::card_width) / 2.0;
-    double card_y = (geometry_.height - card_h) / 2.0;
+    double card_x = (window_.geometry().width - cfg::card_width) / 2.0;
+    double card_y = (window_.geometry().height - card_h) / 2.0;
 
-    cairo_t *cr = cr_;
+    cairo_t *cr = window_.cr();
     cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
     cairo_set_source_rgba(cr, 0, 0, 0, 0);
     cairo_paint(cr);
@@ -379,13 +241,7 @@ void Polkit::paint() {
         info_.set(info);
         info_.draw(cr, content_x, y + (cfg::info_line_height - info_.height()) / 2.0);
     }
-    present();
-}
-
-void Polkit::present() {
-    cairo_surface_flush(surface_);
-    xcb_copy_area(x_.conn(), pixmap_, window_, gc_, 0, 0, 0, 0, geometry_.width, geometry_.height);
-    xcb_flush(x_.conn());
+    window_.present();
 }
 
 } // namespace astralia

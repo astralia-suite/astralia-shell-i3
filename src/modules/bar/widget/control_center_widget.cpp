@@ -1,8 +1,8 @@
 #include "config/bar_config.h"
 
-#include "core/icons.h"
-
 #include "modules/bar/widget/control_center_widget.h"
+
+#include "render/icons.h"
 
 namespace astralia {
 

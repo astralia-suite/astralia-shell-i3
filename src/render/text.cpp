@@ -1,4 +1,4 @@
-#include "core/text.h"
+#include "render/text.h"
 
 namespace astralia {
 

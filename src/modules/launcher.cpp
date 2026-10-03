@@ -1,14 +1,8 @@
 #include <algorithm>
-#include <cairo-xcb.h>
 #include <cstdlib>
 #include <malloc.h>
-#include <numbers>
-#include <string_view>
 #include <sys/timerfd.h>
-#include <xcb/xcb_ewmh.h>
-#include <xcb/xcb_icccm.h>
 
-#include "core/icons.h"
 #include "core/log.h"
 
 #include "modules/launcher.h"
@@ -20,25 +14,14 @@
 #include "modules/launcher/submenu.h"
 #include "modules/launcher/visit_store.h"
 
+#include "render/draw.h"
+#include "render/icons.h"
+
 namespace astralia {
 
 namespace {
 
 namespace cfg = launcher_config;
-
-void set_source(cairo_t *cr, const Color &color) {
-    cairo_set_source_rgba(cr, color.r, color.g, color.b, color.a);
-}
-
-void rounded_rect(cairo_t *cr, double x, double y, double w, double h, double r) {
-    r = std::min({r, w / 2.0, h / 2.0});
-    cairo_new_sub_path(cr);
-    cairo_arc(cr, x + w - r, y + r, r, -std::numbers::pi / 2.0, 0.0);
-    cairo_arc(cr, x + w - r, y + h - r, r, 0.0, std::numbers::pi / 2.0);
-    cairo_arc(cr, x + r, y + h - r, r, std::numbers::pi / 2.0, std::numbers::pi);
-    cairo_arc(cr, x + r, y + r, r, std::numbers::pi, 3.0 * std::numbers::pi / 2.0);
-    cairo_close_path(cr);
-}
 
 void fill_rounded(cairo_t *cr, double x, double y, double w, double h, double r,
                   const Color &color) {
@@ -110,7 +93,8 @@ double content_height(int visible_rows) {
 } // namespace
 
 Launcher::Launcher(XConnection &x, EventLoop &loop, IpcServer &ipc)
-    : x_(x), loop_(loop), keyboard_(x.conn()), text_(cfg::font), small_text_(cfg::small_font),
+    : x_(x), loop_(loop), window_(x, "astralia-launcher", XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_POINTER_MOTION | XCB_EVENT_MASK_LEAVE_WINDOW | XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_FOCUS_CHANGE),
+      keyboard_(x.conn()), text_(cfg::font), small_text_(cfg::small_font),
       glyph_(cfg::icon_font) {
     const char *home = getenv("HOME");
     home_ = home != nullptr ? home : "";
@@ -119,40 +103,9 @@ Launcher::Launcher(XConnection &x, EventLoop &loop, IpcServer &ipc)
         bullets_[i] = load_bullet(i + 1);
     }
 
-    xcb_connection_t *conn = x_.conn();
-    visual_ = x_.argb_visual();
-    depth_ = 32;
-    if (visual_ == nullptr) {
-        visual_ = x_.visual();
-        depth_ = x_.screen()->root_depth;
-    }
-    colormap_ = xcb_generate_id(conn);
-    xcb_create_colormap(conn, XCB_COLORMAP_ALLOC_NONE, colormap_, x_.root(), visual_->visual_id);
-    window_ = xcb_generate_id(conn);
-    std::array<uint32_t, 5> values{XCB_BACK_PIXMAP_NONE, 0, 1,
-                                   XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_BUTTON_PRESS |
-                                       XCB_EVENT_MASK_POINTER_MOTION | XCB_EVENT_MASK_LEAVE_WINDOW |
-                                       XCB_EVENT_MASK_KEY_PRESS |
-                                       XCB_EVENT_MASK_FOCUS_CHANGE,
-                                   colormap_};
-    OutputGeometry output = x_.primary_output();
-    xcb_create_window(conn, depth_, window_, x_.root(), output.x, output.y, output.width,
-                      output.height, 0, XCB_WINDOW_CLASS_INPUT_OUTPUT, visual_->visual_id,
-                      XCB_CW_BACK_PIXMAP | XCB_CW_BORDER_PIXEL | XCB_CW_OVERRIDE_REDIRECT |
-                          XCB_CW_EVENT_MASK | XCB_CW_COLORMAP,
-                      values.data());
-    using namespace std::string_view_literals;
-    constexpr std::string_view name = "astralia-launcher"sv;
-    constexpr std::string_view wm_class = "astralia-launcher\0astralia-shell\0"sv;
-    xcb_ewmh_set_wm_name(x_.ewmh(), window_, name.size(), name.data());
-    xcb_icccm_set_wm_class(conn, window_, wm_class.size(), wm_class.data());
-    gc_ = xcb_generate_id(conn);
-    uint32_t graphics_exposures = 0;
-    xcb_create_gc(conn, gc_, window_, XCB_GC_GRAPHICS_EXPOSURES, &graphics_exposures);
-
     debounce_ = UniqueFd(timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC));
     loop_.on_fd(debounce_.get(), [this] { debounce_fired(); });
-    loop_.on_window(window_, [this](const xcb_generic_event_t &event) { handle(event); });
+    loop_.on_window(window_.id(), [this](const xcb_generic_event_t &event) { handle(event); });
     ipc.add({"launcher",
              [this] {
                  toggle(false);
@@ -170,19 +123,6 @@ Launcher::Launcher(XConnection &x, EventLoop &loop, IpcServer &ipc)
 Launcher::~Launcher() {
     stop_search();
     loop_.remove_fd(debounce_.get());
-    xcb_connection_t *conn = x_.conn();
-    if (open_) {
-        restore_focus();
-    }
-    if (cr_ != nullptr) {
-        cairo_destroy(cr_);
-        cairo_surface_destroy(surface_);
-        xcb_free_pixmap(conn, pixmap_);
-    }
-    xcb_free_gc(conn, gc_);
-    xcb_destroy_window(conn, window_);
-    xcb_free_colormap(conn, colormap_);
-    xcb_flush(conn);
 }
 
 void Launcher::toggle(bool global) {
@@ -194,17 +134,13 @@ void Launcher::toggle(bool global) {
 }
 
 void Launcher::open(bool global) {
-    place(pointer_output());
+    window_.place(x_.pointer_output());
     search_root_ = global || home_.empty() ? "/" : home_;
     apps_ = scan_desktop_entries();
     keyboard_.reload();
     open_ = true;
     paint();
-    xcb_connection_t *conn = x_.conn();
-    uint32_t above = XCB_STACK_MODE_ABOVE;
-    xcb_configure_window(conn, window_, XCB_CONFIG_WINDOW_STACK_MODE, &above);
-    xcb_map_window(conn, window_);
-    take_focus();
+    window_.show(true);
     log::info("launcher: open, searching from {}", search_root_);
 }
 
@@ -212,10 +148,7 @@ void Launcher::close() {
     stop_search();
     itimerspec disarm{};
     timerfd_settime(debounce_.get(), 0, &disarm, nullptr);
-    xcb_connection_t *conn = x_.conn();
-    restore_focus();
-    xcb_unmap_window(conn, window_);
-    xcb_flush(conn);
+    window_.hide();
     open_ = false;
     query_.clear();
     mode_ = LauncherMode::drun;
@@ -228,79 +161,11 @@ void Launcher::close() {
     malloc_trim(0);
 }
 
-void Launcher::place(const OutputGeometry &output) {
-    xcb_connection_t *conn = x_.conn();
-    if (output.width != geometry_.width || output.height != geometry_.height || cr_ == nullptr) {
-        if (cr_ != nullptr) {
-            cairo_destroy(cr_);
-            cairo_surface_destroy(surface_);
-            xcb_free_pixmap(conn, pixmap_);
-        }
-        pixmap_ = xcb_generate_id(conn);
-        xcb_create_pixmap(conn, depth_, pixmap_, window_, output.width, output.height);
-        surface_ = cairo_xcb_surface_create(conn, pixmap_, visual_, output.width, output.height);
-        cr_ = cairo_create(surface_);
-    }
-    if (output != geometry_) {
-        std::array<uint32_t, 4> values{static_cast<uint32_t>(output.x),
-                                       static_cast<uint32_t>(output.y), output.width,
-                                       output.height};
-        xcb_configure_window(conn, window_,
-                             XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y | XCB_CONFIG_WINDOW_WIDTH |
-                                 XCB_CONFIG_WINDOW_HEIGHT,
-                             values.data());
-    }
-    geometry_ = output;
-}
-
-OutputGeometry Launcher::pointer_output() const {
-    xcb_query_pointer_reply_t *reply =
-        xcb_query_pointer_reply(x_.conn(), xcb_query_pointer(x_.conn(), x_.root()), nullptr);
-    OutputGeometry fallback = x_.primary_output();
-    if (reply == nullptr) {
-        return fallback;
-    }
-    int px = reply->root_x;
-    int py = reply->root_y;
-    free(reply);
-    for (const Output &output : x_.outputs()) {
-        const OutputGeometry &g = output.geometry;
-        if (px >= g.x && px < g.x + g.width && py >= g.y && py < g.y + g.height) {
-            return g;
-        }
-    }
-    return fallback;
-}
-
-void Launcher::take_focus() {
-    xcb_connection_t *conn = x_.conn();
-    xcb_get_input_focus_reply_t *reply =
-        xcb_get_input_focus_reply(conn, xcb_get_input_focus(conn), nullptr);
-    previous_focus_ = reply != nullptr ? reply->focus : XCB_NONE;
-    free(reply);
-    xcb_set_input_focus(conn, XCB_INPUT_FOCUS_POINTER_ROOT, window_, XCB_CURRENT_TIME);
-}
-
-void Launcher::restore_focus() {
-    xcb_connection_t *conn = x_.conn();
-    xcb_get_input_focus_reply_t *reply =
-        xcb_get_input_focus_reply(conn, xcb_get_input_focus(conn), nullptr);
-    bool focused = reply != nullptr && reply->focus == window_;
-    free(reply);
-    if (focused) {
-        xcb_window_t target = previous_focus_ != XCB_NONE && previous_focus_ != window_
-                                  ? previous_focus_
-                                  : static_cast<xcb_window_t>(XCB_INPUT_FOCUS_POINTER_ROOT);
-        xcb_set_input_focus(conn, XCB_INPUT_FOCUS_POINTER_ROOT, target, XCB_CURRENT_TIME);
-    }
-    previous_focus_ = XCB_NONE;
-}
-
 void Launcher::handle(const xcb_generic_event_t &event) {
     switch (event.response_type & ~0x80) {
     case XCB_EXPOSE:
         if (open_) {
-            present();
+            window_.present();
         }
         break;
     case XCB_KEY_PRESS:
@@ -595,12 +460,12 @@ void Launcher::paint() {
     int first = first_visible();
     int visible = std::min(static_cast<int>(all.size()), cfg::max_visible);
     double box_h = content_height(visible);
-    double box_x = (geometry_.width - cfg::width) / 2.0;
-    double box_y = (geometry_.height - box_h) / 2.0;
+    double box_x = (window_.geometry().width - cfg::width) / 2.0;
+    double box_y = (window_.geometry().height - box_h) / 2.0;
     box_ = {box_x, box_y, static_cast<double>(cfg::width), box_h};
     hits_.clear();
 
-    cairo_t *cr = cr_;
+    cairo_t *cr = window_.cr();
     cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
     cairo_set_source_rgba(cr, 0, 0, 0, 0);
     cairo_paint(cr);
@@ -710,13 +575,7 @@ void Launcher::paint() {
         }
         cairo_restore(cr);
     }
-    present();
-}
-
-void Launcher::present() {
-    cairo_surface_flush(surface_);
-    xcb_copy_area(x_.conn(), pixmap_, window_, gc_, 0, 0, 0, 0, geometry_.width, geometry_.height);
-    xcb_flush(x_.conn());
+    window_.present();
 }
 
 } // namespace astralia

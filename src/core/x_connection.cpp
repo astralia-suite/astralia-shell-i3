@@ -183,4 +183,23 @@ std::vector<Output> XConnection::outputs() const {
     return result;
 }
 
+OutputGeometry XConnection::pointer_output() const {
+    xcb_query_pointer_reply_t *reply =
+        xcb_query_pointer_reply(conn(), xcb_query_pointer(conn(), root()), nullptr);
+    OutputGeometry fallback = primary_output();
+    if (reply == nullptr) {
+        return fallback;
+    }
+    int px = reply->root_x;
+    int py = reply->root_y;
+    free(reply);
+    for (const Output &output : outputs()) {
+        const OutputGeometry &g = output.geometry;
+        if (px >= g.x && px < g.x + g.width && py >= g.y && py < g.y + g.height) {
+            return g;
+        }
+    }
+    return fallback;
+}
+
 } // namespace astralia

@@ -13,6 +13,8 @@ struct BatteryStatus {
     int percent = 0;
     bool charging = false;
     bool full = false;
+    bool pending = false;
+    int seconds_left = 0;
 
     bool operator==(const BatteryStatus &) const = default;
 };

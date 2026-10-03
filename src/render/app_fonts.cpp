@@ -2,8 +2,9 @@
 #include <fontconfig/fontconfig.h>
 #include <string>
 
-#include "core/app_fonts.h"
 #include "core/log.h"
+
+#include "render/app_fonts.h"
 
 namespace astralia {
 
