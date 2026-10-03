@@ -2,8 +2,8 @@
 
 namespace astralia {
 
-WidgetCapsule::WidgetCapsule(const CapsuleStyle &style, LabelMode mode)
-    : icon_(style.icon_font), label_(style.label_font), label_gap_(style.label_gap), mode_(mode) {}
+WidgetCapsule::WidgetCapsule(const CapsuleStyle &style)
+    : icon_(style.icon_font), label_(style.label_font), label_gap_(style.label_gap) {}
 
 bool WidgetCapsule::set_hovered(bool hovered) {
     if (hovered == hovered_) {
@@ -22,7 +22,7 @@ bool WidgetCapsule::set_pinned(bool pinned) {
 }
 
 bool WidgetCapsule::label_shown() const {
-    return label_.width() > 0 && (mode_ == LabelMode::always || hovered_ || pinned_);
+    return label_.width() > 0 && (hovered_ || pinned_);
 }
 
 int WidgetCapsule::gap() const { return icon_.width() > 0 ? label_gap_ : 0; }
@@ -36,10 +36,6 @@ void WidgetCapsule::draw(cairo_t *cr, double x, int top, int height) const {
     if (label_shown()) {
         label_.draw_centered(cr, x + icon_.width() + gap(), top, height);
     }
-}
-
-void WidgetCapsule::draw_ink_centered(cairo_t *cr, double cx, double cy) const {
-    label_.draw_ink_centered(cr, cx, cy);
 }
 
 } // namespace astralia

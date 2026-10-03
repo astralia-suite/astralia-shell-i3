@@ -16,6 +16,7 @@
 #include "core/runtime_paths.h"
 
 #include "modules/bar/panel/battery_panel.h"
+#include "modules/bar/panel/clock_panel.h"
 #include "modules/bar/panel/network_panel.h"
 #include "modules/bar/widget/battery_widget.h"
 #include "modules/bar/widget/bluetooth_widget.h"
@@ -43,6 +44,7 @@
 
 #include "service/audio_service.h"
 #include "service/bluetooth_service.h"
+#include "service/media_service.h"
 #include "service/network_service.h"
 
 namespace {
@@ -462,6 +464,39 @@ void check_status_panels() {
     check(astralia::battery_state_label({true, 100, false, true, false, 0}) == "Full", "full label");
 }
 
+void check_calendar() {
+    using astralia::CalendarDay;
+    std::array<CalendarDay, 42> oct = astralia::clock_panel_cells(2026, 9);
+    check(oct[0].year == 2026 && oct[0].month == 8 && oct[0].day == 28 && !oct[0].in_month, "October 2026 grid starts on Monday 28 September");
+    check(oct[3].month == 9 && oct[3].day == 1 && oct[3].in_month, "1 October 2026 is a Thursday");
+    check(oct[41].month == 10 && oct[41].day == 8, "grid ends on 8 November");
+    std::array<CalendarDay, 42> jun = astralia::clock_panel_cells(2026, 5);
+    check(jun[0].day == 1 && jun[0].in_month, "a month starting on Monday has no leading days");
+    check(astralia::clock_panel_same_day(oct[3], 2026, 9, 1), "same day matches");
+    check(!astralia::clock_panel_same_day(oct[0], 2026, 9, 28), "same day needs the month");
+    astralia::CalendarMonth back = astralia::clock_panel_month_shifted(2026, 0, -1);
+    check(back.year == 2025 && back.month == 11, "January minus one is last December");
+    astralia::CalendarMonth ahead = astralia::clock_panel_month_shifted(2026, 11, 13);
+    check(ahead.year == 2028 && ahead.month == 0, "December plus 13 is January two years on");
+    check(astralia::clock_panel_iso_week(2026, 0, 1) == 1, "1 January 2026 is week 1");
+    check(astralia::clock_panel_iso_week(2027, 0, 1) == 53, "1 January 2027 is week 53 of 2026");
+    check(astralia::clock_panel_iso_week(2024, 11, 30) == 1, "30 December 2024 is week 1 of 2025");
+    check(astralia::clock_panel_iso_week(2026, 9, 4) == 40, "4 October 2026 is week 40");
+}
+
+void check_media() {
+    using astralia::MediaPlayback;
+    check(astralia::media_parse_playback("Playing") == MediaPlayback::playing, "Playing parses");
+    check(astralia::media_parse_playback("Paused") == MediaPlayback::paused, "Paused parses");
+    check(astralia::media_parse_playback("bogus") == MediaPlayback::stopped, "unknown is stopped");
+    check(astralia::media_format_position(0) == "0:00", "zero position");
+    check(astralia::media_format_position(65'000'000) == "1:05", "pads seconds");
+    check(astralia::media_format_position(-5) == "0:00", "negative clamps");
+    check(astralia::media_select_player({}) == -1, "no players");
+    check(astralia::media_select_player({{"a", MediaPlayback::paused}, {"b", MediaPlayback::playing}}) == 1, "playing wins");
+    check(astralia::media_select_player({{"a", MediaPlayback::paused}, {"b", MediaPlayback::stopped}}) == 0, "else the first");
+}
+
 int main() {
     check_ms_until_next_second();
     check_parse_invocation();
@@ -486,6 +521,8 @@ int main() {
     check_slider();
     check_network_parse();
     check_status_panels();
+    check_calendar();
+    check_media();
     if (failures > 0) {
         std::println(stderr, "{} check(s) failed", failures);
         return EXIT_FAILURE;

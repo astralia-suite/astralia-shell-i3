@@ -54,6 +54,39 @@ inline constexpr const char *panel_echo_file = "electro.png";
 inline constexpr int panel_echo_size = 20;
 inline constexpr int panel_echo_row_height = 40;
 
+// Media panel
+inline constexpr int media_thumb_size = 72;
+inline constexpr double media_thumb_radius = 8.0;
+inline constexpr int media_title_gap = 12;
+inline constexpr int media_title_spacing = 3;
+inline constexpr int media_progress_top = 10;
+inline constexpr int media_progress_height = 20;
+inline constexpr int media_controls_top = 8;
+inline constexpr int media_controls_height = 32;
+inline constexpr int media_controls_spacing = 8;
+inline constexpr int media_side_button = 28;
+inline constexpr int media_play_button = 32;
+inline constexpr std::chrono::milliseconds media_poll_interval{1000};
+
+// Clock panel
+inline constexpr int clock_panel_width = 504;
+inline constexpr int clock_column_gap = 16;
+inline constexpr int clock_weekday_line = 26;
+inline constexpr int clock_date_line = 18;
+inline constexpr int clock_line_gap = 2;
+inline constexpr int clock_big_day_row = 74;
+inline constexpr int clock_big_day_gap = 6;
+inline constexpr int clock_week_line = 16;
+inline constexpr int clock_grid_header = 24;
+inline constexpr int clock_grid_header_gap = 15;
+inline constexpr int clock_weekday_row = 22;
+inline constexpr int clock_grid_top_gap = 2;
+inline constexpr int clock_cell_padding = 4;
+inline constexpr int clock_nav_button = 20;
+inline constexpr int clock_nav_gap = 6;
+inline constexpr int clock_today_dot = 6;
+inline constexpr const char *clock_big_day_font = "Comic Shanns Mono 48";
+
 // Typography
 inline constexpr const char *font = "Comic Shanns Mono 15";
 inline constexpr const char *icon_font = "tabler-icons 17";
@@ -61,6 +94,7 @@ inline constexpr const char *icon_font = "tabler-icons 17";
 // Content
 inline constexpr const char *clock_format = "%a %Y-%m-%d %H:%M:%S";
 inline constexpr const char *logout_label = "Logout";
+inline constexpr const char *media_label = "Media";
 inline constexpr const char *bluetooth_idle_label = "Idle";
 inline constexpr const char *bluetooth_disabled_label = "Disabled";
 

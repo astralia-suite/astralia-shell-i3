@@ -16,12 +16,15 @@
 #include "modules/bar/panel/battery_panel.h"
 #include "modules/bar/panel/bluetooth_panel.h"
 #include "modules/bar/panel/brightness_panel.h"
+#include "modules/bar/panel/clock_panel.h"
+#include "modules/bar/panel/media_panel.h"
 #include "modules/bar/panel/network_panel.h"
 #include "modules/bar/widget/battery_widget.h"
 #include "modules/bar/widget/bluetooth_widget.h"
 #include "modules/bar/widget/brightness_widget.h"
 #include "modules/bar/widget/clock_widget.h"
 #include "modules/bar/widget/logout_widget.h"
+#include "modules/bar/widget/media_widget.h"
 #include "modules/bar/widget/network_widget.h"
 #include "modules/bar/widget/volume_widget.h"
 #include "modules/bar/widget/workspace_widget.h"
@@ -36,13 +39,14 @@ Bar::Bar(XConnection &x, EventLoop &loop, IpcServer &ipc, Services &services)
       window_(x, "astralia-shell", XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_POINTER_MOTION | XCB_EVENT_MASK_LEAVE_WINDOW, false) {
     register_app_fonts();
     clock_ = std::make_unique<ClockWidget>();
+    media_ = std::make_unique<MediaWidget>();
     logout_ = std::make_unique<LogoutWidget>();
     bluetooth_ = std::make_unique<BluetoothWidget>();
     network_ = std::make_unique<NetworkWidget>();
     brightness_ = std::make_unique<BrightnessWidget>();
     volume_ = std::make_unique<VolumeWidget>();
     battery_ = std::make_unique<BatteryWidget>();
-    items_ = {bluetooth_.get(), network_.get(), brightness_.get(), volume_.get(), battery_.get()};
+    items_ = {network_.get(), bluetooth_.get(), volume_.get(), brightness_.get(), battery_.get(), media_.get(), clock_.get()};
     OutputGeometry output = x_.primary_output();
     width_ = output.width;
     height_ = bar_config::margin_top + bar_config::height;
@@ -76,6 +80,8 @@ Bar::Bar(XConnection &x, EventLoop &loop, IpcServer &ipc, Services &services)
     battery_panel_ = std::make_unique<BatteryPanel>(x_, loop, services_.battery);
     bluetooth_panel_ = std::make_unique<BluetoothPanel>(x_, loop, services_.bluetooth);
     network_panel_ = std::make_unique<NetworkPanel>(x_, loop, services_.network);
+    media_panel_ = std::make_unique<MediaPanel>(x_, loop, services_.media);
+    clock_panel_ = std::make_unique<ClockPanel>(x_, loop);
     for (std::size_t i = 0; i < item_count; ++i) {
         panel_window(static_cast<Item>(i)).changed.connect([this] { sync_panels(); });
         refresh(static_cast<Item>(i));
@@ -179,40 +185,47 @@ void Bar::draw_all() {
     draw_workspace_row(window_.cr(), workspaces, workspace_rect_.x, panel_.y, panel_.height);
     draw_divider(logout_rect_, workspace_rect_);
 
-    clock_rect_ = clock_rect();
-    draw_clock();
-
+    int center_x = panel_.x + (panel_.width - media_->width() - bar_config::item_gap - clock_->width()) / 2;
+    item_rects_[media] = {center_x, panel_.y, media_->width(), panel_.height};
+    item_rects_[clock] = {center_x + media_->width() + bar_config::item_gap, panel_.y, clock_->width(), panel_.height};
     set_source(window_.cr(), palette::text);
+    media_->draw(window_.cr(), item_rects_[media].x, panel_.y, panel_.height);
+    clock_->draw(window_.cr(), item_rects_[clock].x, panel_.y, panel_.height);
+    draw_divider(item_rects_[media], item_rects_[clock]);
+
     int right = panel_.x + panel_.width - bar_config::padding_x;
-    for (std::size_t i = item_count; i-- > 0;) {
+    const Rect *right_neighbor = nullptr;
+    for (std::size_t i = media; i-- > 0;) {
         WidgetCapsule &item = *items_[i];
         int item_width = item.visible() ? item.width() : 0;
         item_rects_[i] = {right - item_width, panel_.y, item_width, panel_.height};
         if (item.visible()) {
+            set_source(window_.cr(), palette::text);
             item.draw(window_.cr(), item_rects_[i].x, panel_.y, panel_.height);
+            if (right_neighbor != nullptr) {
+                draw_divider(item_rects_[i], *right_neighbor);
+            }
+            right_neighbor = &item_rects_[i];
             right -= item_width + bar_config::item_gap;
         }
     }
     window_.present(whole.x, whole.y, whole.width, whole.height);
 }
 
-void Bar::draw_clock() {
-    set_source(window_.cr(), palette::text);
-    clock_->draw_ink_centered(window_.cr(), panel_.x + panel_.width / 2.0, panel_.y + panel_.height / 2.0);
-}
-
 void Bar::redraw_clock() {
     if (!clock_->refresh()) {
         return;
     }
-    Rect previous = clock_rect_;
-    clock_rect_ = clock_rect();
-    int left = std::min(previous.x, clock_rect_.x);
-    int right = std::max(previous.x + previous.width, clock_rect_.x + clock_rect_.width);
+    const Rect &rect = item_rects_[clock];
+    if (clock_->width() != rect.width) {
+        draw_all();
+        return;
+    }
     constexpr int border = static_cast<int>(bar_config::border_width);
-    Rect dirty{left, panel_.y + border, right - left, panel_.height - 2 * border};
+    Rect dirty{rect.x, panel_.y + border, rect.width, panel_.height - 2 * border};
     paint_background(dirty);
-    draw_clock();
+    set_source(window_.cr(), palette::text);
+    clock_->draw(window_.cr(), rect.x, panel_.y, panel_.height);
     window_.present(dirty.x, dirty.y, dirty.width, dirty.height);
 }
 
@@ -233,6 +246,8 @@ void Bar::refresh(Item item) {
     case battery:
         battery_->update(services_.battery.status());
         break;
+    case media:
+    case clock:
     case item_count:
         break;
     }
@@ -248,6 +263,10 @@ PanelWindow &Bar::panel_window(Item item) {
         return brightness_panel_->window();
     case volume:
         return audio_panel_->window();
+    case media:
+        return media_panel_->window();
+    case clock:
+        return clock_panel_->window();
     case battery:
     case item_count:
         break;
@@ -272,6 +291,12 @@ void Bar::toggle_panel(Item item) {
         break;
     case battery:
         battery_panel_->toggle();
+        break;
+    case media:
+        media_panel_->toggle();
+        break;
+    case clock:
+        clock_panel_->toggle();
         break;
     case item_count:
         break;
@@ -398,11 +423,6 @@ std::chrono::milliseconds Bar::until_linger_end() const {
         return std::chrono::hours(1);
     }
     return std::chrono::ceil<std::chrono::milliseconds>(left);
-}
-
-Bar::Rect Bar::clock_rect() const {
-    int width = clock_->width();
-    return {panel_.x + (panel_.width - width) / 2, panel_.y, width, panel_.height};
 }
 
 } // namespace astralia

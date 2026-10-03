@@ -10,148 +10,152 @@
 
 ## `/`
 
-- `meson.build`: Builds `astralia-core` static library, `astralia-shell` executable and `astralia-shell-test` unit test; installs fonts and assets.
-- `meson.options`: `native_cpu` option adding `-march=westmere` for the ThinkPad X201.
-- `build.sh`: Build, `setup` dependencies (build libraries plus `pipewire`, `wireplumber`, `bluez`, `networkmanager`, `upower`, `fd`, `brightnessctl`), `test`, `install` to `/usr/bin`, or `run` (kill, install, start `astralia-shell`).
-- `.clang-format`: Project code style (LLVM base, 4-space indent, no column limit, preserved include blocks).
+- `meson.build`: Builds the core library, shell executable and unit tests; installs fonts and assets.
+- `meson.options`: Optional native CPU tuning for the ThinkPad X201.
+- `build.sh`: Builds, installs dependencies, runs tests, installs or restarts the shell.
+- `.clang-format`: Project code style.
 
 ## `assets/fonts/`
 
-- `tabler-icons.ttf`: Tabler icon font, installed to `/usr/share/astralia-shell/fonts/`.
-- `ComicShannsMono-Regular.otf`: Unpatched Comic Shanns Mono text font, installed next to the icon font.
-- `YujiMai.ttf`: Yuji Mai brush font for the logout button glyphs, installed next to the icon font.
+- `tabler-icons.ttf`: Icon font.
+- `ComicShannsMono-Regular.otf`: Text font.
+- `YujiMai.ttf`: Brush font for the logout glyphs.
 
 ## `assets/constellation/`
 
-- `C1.png`…`C6.png`: Launcher row bullets, installed to `/usr/share/astralia-shell/constellation/`.
+- `C1.png`…`C6.png`: Launcher row bullets.
 
 ## `assets/logout/`
 
-- `logo.png`: Logout overlay center logo, installed to `/usr/share/astralia-shell/logout/`.
+- `logo.png`: Logout overlay center logo.
 
 ## `assets/polkit/`
 
-- `electro.png`: Polkit password echo glyph, installed to `/usr/share/astralia-shell/polkit/`.
+- `electro.png`: Password echo glyph.
 
 ## `src/`
 
-- `main.cpp`: Parses the mode; runs the IPC client, or locks, daemonizes, creates X, loop, IPC server, shared `Services`, then wallpaper, bar, launcher, logout, polkit, notifications and OSD.
+- `main.cpp`: Runs the IPC client, or starts the daemon with its shared services and modules.
 
 ## `src/app/`
 
-- `services.{h,cpp}`: `Services` owns every shared service (buses, i3, network, Bluetooth, battery, brightness, notifications, polkit, audio); modules take it by reference.
+- `services.{h,cpp}`: Owns every shared service, passed to modules by reference.
 
 ## `src/core/`
 
-- `cli.{h,cpp}`: `parse_invocation()`: no arguments → daemon, `debug` → foreground, anything else → IPC client command.
-- `runtime_paths.{h,cpp}`: Per-display lock, socket and log paths under `$XDG_RUNTIME_DIR` or `/tmp`.
-- `single_instance.{h,cpp}`: RAII `flock` on the per-display lock file; fails with `already running`.
-- `daemon.{h,cpp}`: `daemonize()`: fork, `setsid`, stdin from `/dev/null`, stdout/stderr to the per-display log.
-- `ipc.{h,cpp}`: Unix socket `IpcServer` with verb handlers (built-in `help`, `kill`), in-process `dispatch()`, `format_help()`, and `run_ipc_client()`.
-- `unique_fd.h`: Move-only RAII file descriptor.
-- `log.{h,cpp}`: `log::info` and `log::error` formatted messages to stderr.
-- `x_connection.{h,cpp}`: RAII xcb connection (syncs before disconnect, cairo MIT-SHM disabled) with screen, root and ARGB visuals, EWMH, atoms, RandR outputs, `pointer_output()` (the output under the pointer, primary as fallback).
-- `event_loop.{h,cpp}`: `poll()` loop over X, `signalfd`, a `CLOCK_BOOTTIME` `timerfd`, extra fds and prepare/dispatch poll sources; window and event-type handlers, timers with `reschedule()`, `stop()`.
-- `keyboard.{h,cpp}`: xkbcommon-x11 keymap; translates key presses, with modifiers from the event, to text, backspace, arrows, enter, escape.
-- `async_process.{h,cpp}`: `AsyncProcess`: `posix_spawnp` child with captured stdout (optionally stderr), read to EOF on a detached thread; an `eventfd` on the `EventLoop` delivers the output to a main-thread callback; restart or cancel kills and drops the stale result.
-- `spawn.{h,cpp}`: `spawn_detached()`: double-forked `sh -c` with an empty signal mask and default `SIGPIPE`.
-- `signal.h`: `Signal<Args...>` subscriber list; services expose it, modules `connect()`, services `emit()`.
-- `dbus.{h,cpp}`: `SystemBus` sdbus-c++ system or session (`BusKind`) connection driven by `EventLoop` fds, `add_match()`, `proxy()`, and `dbus_property<T>()` via proxy or path.
+- `cli.{h,cpp}`: Picks daemon, foreground or IPC client mode from the arguments.
+- `runtime_paths.{h,cpp}`: Per-display lock, socket and log paths.
+- `single_instance.{h,cpp}`: Ensures one shell per display.
+- `daemon.{h,cpp}`: Detaches the shell into the background with output to the log.
+- `ipc.{h,cpp}`: Unix socket IPC server, verb dispatch and client.
+- `unique_fd.h`: Owning file descriptor.
+- `log.{h,cpp}`: Info and error logging to stderr.
+- `x_connection.{h,cpp}`: X connection with screen, visuals, atoms, EWMH and RandR outputs.
+- `event_loop.{h,cpp}`: Main loop for X events, signals, timers and file descriptors.
+- `keyboard.{h,cpp}`: Translates key presses to text and editing keys.
+- `async_process.{h,cpp}`: Runs a child process and returns its output on the main thread.
+- `spawn.{h,cpp}`: Launches detached shell commands.
+- `signal.h`: Change notifications from services to modules.
+- `dbus.{h,cpp}`: System and session D-Bus connections, matches, proxies and property reads.
 
 ## `src/config/`
 
-- `bar_config.h`: Bar geometry, corner radius, padding, border, pill sizes, divider and brightness panel sizes, panel size, row/section/slider/empty heights, scroll step, placement and bar-only panel values (volume step, password minimum, `electro.png` echo), fonts, `strftime` clock format, 50 ms panel-close linger and `malloc_trim` interval.
-- `logout_config.h`: Logout button ring geometry, Yuji Mai glyph font, logo file and the 8-entry glyph/command action table.
-- `launcher_config.h`: Launcher geometry, fonts, launch commands, search limits, and result, submenu and visit plain types.
-- `polkit_config.h`: Polkit card geometry, line heights, fonts, prompt texts and echo glyph file.
-- `notification_config.h`: Notification stack margins, spacing, 480 px stack cap, 400 px card geometry, wrap width, close x size, app/title/body fonts and the fixed 5 s `hang_time`.
-- `osd_config.h`: OSD pill geometry from `hl` widened to 300×50 so content clears the round ends (30 px bottom margin), fonts, 2 s visibility and 1 s startup delay.
-- `wallpaper_config.h`: Wallpaper config file path under the config dir, `*` wildcard output key.
+- `bar_config.h`: Bar, widget and panel constants.
+- `logout_config.h`: Logout overlay constants and actions.
+- `launcher_config.h`: Launcher constants and result types.
+- `polkit_config.h`: Polkit card constants and prompt texts.
+- `notification_config.h`: Notification card and stack constants.
+- `osd_config.h`: OSD pill constants and timings.
+- `wallpaper_config.h`: Wallpaper config file location and wildcard key.
 
 ## `src/modules/`
 
-- `bar.{h,cpp}`: Top dock with inset pill-shaped panel, EWMH hints and strut; subscribes to shared i3, network, Bluetooth and battery services; logout and workspaces left, clock center, status items right (Bluetooth, network, brightness, volume, battery), laid out right to left, 1 px dividers between widget groups; logout click dispatches `logout` IPC, each status item toggles its panel; opening a panel or clicking elsewhere on the bar closes the others, a status item stays expanded while its panel is open and lingers 50 ms after close before re-checking the pointer; sends status-change `Notify` on the session bus; periodic `malloc_trim`.
-- `launcher.{h,cpp}`: `launcher` / `launcher global` IPC toggle; override-redirect overlay on the pointer's output; takes input focus, closes on focus loss; `malloc_trim` on close.
-- `logout.{h,cpp}`: `logout` IPC toggle; override-redirect overlay on the pointer's output with 8 glyph buttons around the logo; keys, hover, click run actions.
-- `notification.{h,cpp}`: Subscribes to the shared `NotificationService`; unfocusable override-redirect card stack at the pointer output's bottom right; top-right x dismisses a card.
-- `polkit.{h,cpp}`: Subscribes to the shared `PolkitService`; override-redirect card on the pointer's output while a request is pending; masked password, `Enter` submits, `Escape` cancels.
-- `osd.{h,cpp}`: Unfocusable, click-through (empty `SHAPE` input region) override-redirect pill at the pointer output's bottom center; shows brightness, volume or mic level on service changes, hides after 2 s.
-- `wallpaper.{h,cpp}`: Per-output root pixmap from `wallpaper.conf` via `_XROOTPMAP_ID`, cleared on exit; repaints on RandR or `inotify` changes, then `malloc_trim`.
+- `bar.{h,cpp}`: Top bar with logout, workspaces, media, clock and status widgets; opens their panels.
+- `launcher.{h,cpp}`: App, file and command launcher overlay.
+- `logout.{h,cpp}`: Logout overlay with power action buttons.
+- `notification.{h,cpp}`: Desktop notification cards.
+- `polkit.{h,cpp}`: Polkit password prompt.
+- `osd.{h,cpp}`: Brightness, volume and mic level popup.
+- `wallpaper.{h,cpp}`: Per-output desktop wallpaper.
 
 ## `src/modules/bar/widget/`
 
-- `bar_widget.h`: `BarWidget`, a `WidgetCapsule` styled with the bar's fonts and label gap; base of every bar widget except workspaces.
-- `clock_widget.{h,cpp}`: Capsule with always-shown local date and time text (`Mon 1970-01-01 00:00:00`) and `ms_until_next_second()` for per-second redraws.
-- `logout_widget.{h,cpp}`: Capsule with `icon::power` and a `Logout` label shown only while hovered.
-- `workspace_widget.{h,cpp}`: Pill row (active wider, accent), `workspace_row_width()` and click hit-test `workspace_at()`.
-- `bluetooth_widget.{h,cpp}`: `BluetoothWidget` capsule with device, `Idle` or `Disabled` label; pure `bluetooth_icon()`, `bluetooth_label()`.
-- `network_widget.{h,cpp}`: `NetworkWidget` capsule with SSID label; pure `network_icon()`.
-- `brightness_widget.{h,cpp}`: `BrightnessWidget` capsule with percent label, hidden without a backlight.
-- `volume_widget.{h,cpp}`: `VolumeWidget` capsule with percent or `Muted` label.
-- `battery_widget.{h,cpp}`: `BatteryWidget` capsule with percent or `Plugged in` label; pure `battery_icon()`, `battery_label()`.
-
-## `src/render/`
-
-- `text.{h,cpp}`: Cached `PangoLayout` with a fixed font; set text, optional word wrap or end ellipsis, measure pixel size, draw (vertically centered, ink centered or ink left-aligned and vertically centered) on cairo.
-- `palette.h`: `Color`, `constexpr` `color("#hex")` parser, shared `palette::` colors and `metrics::` radii/borders.
-- `icons.h`: `icon::` Tabler glyph codepoints as UTF-8 strings; `volume_threshold()` and `brightness_threshold()` level icons, as in `hl`.
-- `app_fonts.{h,cpp}`: Idempotent `register_app_fonts()` adds the icon, text and Yuji Mai fonts to fontconfig from the install or source dir.
-- `image_decode.{h,cpp}`: `SurfacePtr` and `decode_image()`: `stb_image` rasters or `resvg` SVGs into premultiplied cairo surfaces, optionally fit to a size.
-- `widget_capsule.{h,cpp}`: `WidgetCapsule` with a `CapsuleStyle` (fonts, label gap): optional icon and label strings, `LabelMode` `on_hover` or `always`, visible, hovered and pinned flags, width, draw and ink-centered label draw.
-- `draw.{h,cpp}`: `set_source()` and `rounded_rect()` cairo helpers shared by every module.
-- `x_window.{h,cpp}`: `XWindow`: 32-bit (or root-depth fallback) window with own colormap, name and class, GC, lazily sized pixmap and cairo context (`place()`, `release()`), raise/map with optional focus take (`show()`, `focus()`), unmap with focus restore (`hide()`), `clear()`, `present()`; optional override-redirect.
-- `panel_chrome.{h,cpp}`: `panel_config::` shared panel geometry and fonts; shared panel drawing on cairo: card, header with close button, toggle, icon button, section label, device row, centered message, confirm card; `PanelRect`/`PanelHit` click regions; pure `panel_clamp_scroll()`, `panel_intersect()`, `panel_hit_at()`.
-- `slider.{h,cpp}`: `draw_slider()`: track, accent fill ending under a 12 px white knob inset so it never leaves the track, optional accent focus dot for the dragged, hovered or selected slider; pure `slider_percent_at()` over the same inset range.
-- `panel_window.{h,cpp}`: `PanelWindow` on an `XWindow`: placed by `open(right_margin, top)` on the primary output, takes focus, grabs the pointer with owner events on first expose so a click outside any shell window closes it, also closes on focus loss, emits `changed` on open and close, height up to a fixed max, pixmap allocated on first paint and freed on close, owner gets the remaining events.
+- `bar_widget.h`: Base for bar widgets with the bar's fonts.
+- `clock_widget.{h,cpp}`: Clock icon with date and time label.
+- `media_widget.{h,cpp}`: Media icon with label.
+- `logout_widget.{h,cpp}`: Logout icon with label.
+- `workspace_widget.{h,cpp}`: Workspace pill row and click hit-test.
+- `bluetooth_widget.{h,cpp}`: Bluetooth icon with device or state label.
+- `network_widget.{h,cpp}`: Network icon with SSID label.
+- `brightness_widget.{h,cpp}`: Brightness icon with percent label.
+- `volume_widget.{h,cpp}`: Volume icon with percent or muted label.
+- `battery_widget.{h,cpp}`: Battery icon with percent or plugged-in label.
 
 ## `src/modules/bar/panel/`
 
-- `brightness_panel.{h,cpp}`: Panel-width card with `Brightness` header and one slider (click, drag, wheel) on a `PanelWindow`, following live service changes.
-- `audio_panel.{h,cpp}`: Output and input sliders, per-application playback sliders, output and input device lists (click sets the default); drag, wheel and `Left`/`Right` step volume; mute buttons.
-- `battery_panel.{h,cpp}`: UPower display-device row: state, time to full or empty, colored charge bar and percent; `No battery detected` otherwise; pure `battery_time_left()`, `battery_state_label()`.
-- `bluetooth_panel.{h,cpp}`: Power toggle, Connected / Paired / Nearby device rows; click connects, pairs or asks to disconnect, forget button asks to forget; discovery runs while open.
-- `network_panel.{h,cpp}`: Wi-Fi toggle, rescan button, error banner, Connected / Known / Available rows sorted by signal; password card for new secured networks echoing typed characters as `electro.png` glyphs, confirm cards for disconnect and forget; scanning runs while open; `network_signal_icon()`.
+- `brightness_panel.{h,cpp}`: Brightness slider panel.
+- `audio_panel.{h,cpp}`: Output, input and per-app volume, mute and default device panel.
+- `battery_panel.{h,cpp}`: Battery state, time left and charge panel.
+- `bluetooth_panel.{h,cpp}`: Bluetooth power and device connect, pair and forget panel.
+- `media_panel.{h,cpp}`: Now-playing panel with art, track info, position and playback controls.
+- `clock_panel.{h,cpp}`: Calendar panel with today's date and month navigation.
+- `network_panel.{h,cpp}`: Wi-Fi toggle and network connect, disconnect and forget panel.
 
 ## `src/modules/launcher/`
 
-- `app_icon.{h,cpp}`: Icon theme order, `resolve_app_icon_path()` over GTK theme, fallbacks and pixmaps; `load_app_icon()` via `decode_image()`.
-- `apps_provider.{h,cpp}`: `to_lower()`, substring `score_app()` and `search_apps()` over desktop entries.
-- `desktop_entry.{h,cpp}`: `.desktop` parser, `Exec` field-code stripping, XDG application dirs and deduplicated scan.
-- `files_provider.{h,cpp}`: Path helpers, UTF-8 elision, glob pattern, multi-part `score_path()`, `fd` argv and output parsing, directory listing.
-- `launch_action.{h,cpp}`: Shell quoting, URL normalizing, run and web modes, app and submenu launches via `spawn_detached()`.
-- `search.{h,cpp}`: Prefix mode detection and ranked app/dir/file results by tier, visits, score, name.
-- `search_process.{h,cpp}`: `fd` child via `posix_spawnp` with a non-blocking stdout pipe; cancel kills and reaps.
-- `submenu.{h,cpp}`: Directory browse, directory actions, file actions and back navigation state.
-- `visit_store.{h,cpp}`: Launch counts in `$XDG_STATE_HOME/astralia-shell/launcher_visits`.
+- `app_icon.{h,cpp}`: Finds and loads application icons.
+- `apps_provider.{h,cpp}`: Searches desktop applications.
+- `desktop_entry.{h,cpp}`: Reads `.desktop` files.
+- `files_provider.{h,cpp}`: Searches and lists files and directories.
+- `launch_action.{h,cpp}`: Launches apps, commands, URLs and file actions.
+- `search.{h,cpp}`: Ranks launcher results.
+- `search_process.{h,cpp}`: Runs the file search child process.
+- `submenu.{h,cpp}`: Directory and file action submenu state.
+- `visit_store.{h,cpp}`: Stores launch counts.
 
 ## `src/modules/logout/`
 
-- `layout.{h,cpp}`: `Point`, ring `logout_button_center()` and square hit-test `logout_button_at()`.
+- `layout.{h,cpp}`: Logout button positions and hit-test.
 
 ## `src/modules/notification/`
 
-- `layout.{h,cpp}`: `notification_card_height()` from measured text, `notification_fit_count()` under the stack cap, stack height, bottom-right `notification_stack_origin()` and close-x hit-test `notification_close_at()`.
+- `layout.{h,cpp}`: Notification card sizes, stack position and close hit-test.
 
 ## `src/modules/polkit/`
 
-- `layout.{h,cpp}`: `utf8_length()`, `polkit_card_height()` and `polkit_visible_dots()` for the card.
+- `layout.{h,cpp}`: Polkit card height and password dot count.
 
 ## `src/modules/wallpaper/`
 
-- `config_file.{h,cpp}`: Config path, `output = image` line parser with `~/` expansion and `*` fallback lookup.
-- `image.{h,cpp}`: `cover()` fill-and-crop placement; `load_image()` decodes via `decode_image()`.
+- `config_file.{h,cpp}`: Reads the wallpaper config file.
+- `image.{h,cpp}`: Loads and fits wallpaper images.
+
+## `src/render/`
+
+- `text.{h,cpp}`: Measures and draws text.
+- `palette.h`: Shared colors, radii and borders.
+- `icons.h`: Icon glyph codepoints and level icon pickers.
+- `app_fonts.{h,cpp}`: Registers the bundled fonts.
+- `image_decode.{h,cpp}`: Decodes raster and SVG images.
+- `widget_capsule.{h,cpp}`: Icon and label widget with hover-revealed label.
+- `draw.{h,cpp}`: Shared cairo drawing helpers.
+- `x_window.{h,cpp}`: Drawable X window.
+- `panel_chrome.{h,cpp}`: Shared panel constants and drawing pieces.
+- `slider.{h,cpp}`: Draws sliders and maps clicks to percent.
+- `panel_window.{h,cpp}`: Popup window for bar panels.
 
 ## `src/service/`
 
-- `i3_service.{h,cpp}`: i3 workspace numbers, occupied and current from EWMH root property events; `switch_to()` via the i3 IPC socket.
-- `bluetooth_service.{h,cpp}`: BlueZ `GetManagedObjects` on a held root proxy: adapter present, powered, first connected device alias, device list with battery; async `Powered`, discovery, `Connect`, `Disconnect`, `Pair`, `RemoveDevice` through per-device proxies pruned from the signal handler; refreshes on `org.bluez` signals; `bluetooth_changes()` connect/disconnect messages.
-- `network_service.{h,cpp}`: NetworkManager type, captive portal, Wi-Fi strength, SSID and `WirelessEnabled` via a held manager proxy; refreshes on `PropertiesChanged`; `nmcli` via `AsyncProcess` (port of `hl`) for the Wi-Fi list, connect, disconnect and forget, with a profiles → quick list → rescan chain repeating only between `start_watch()` and `stop_watch()`; pure `nmcli` parsers; `network_changes()` connect/disconnect/portal messages.
-- `polkit_service.{h,cpp}`: Polkit authentication agent on the session; drives the default `GMainContext` via an `EventLoop` poll source; request, response and info state.
-- `notification_service.{h,cpp}`: `org.freedesktop.Notifications` server on the session bus; FIFO list expiring each entry after `hang_time`.
-- `brightness_service.{h,cpp}`: First `/sys/class/backlight` device percent, `inotify` change signal; `set()` via `brightnessctl`.
-- `audio_service.{h,cpp}`: `libpipewire` sinks, sources and playback/capture streams with level and mute on the `EventLoop`; route-or-node `set_volume()`/`set_mute()`, `set_default()` via default metadata; `AudioKind::nodes` on any node change; pure `audio_percent()`.
-- `battery_service.{h,cpp}`: UPower `DisplayDevice` presence, percent, charging, full and pending state, `TimeToFull`/`TimeToEmpty` via a held proxy; refreshes on its signals.
+- `i3_service.{h,cpp}`: i3 workspace state and switching.
+- `bluetooth_service.{h,cpp}`: Bluetooth adapter and device state and control.
+- `network_service.{h,cpp}`: Network state and Wi-Fi control.
+- `polkit_service.{h,cpp}`: Polkit authentication agent.
+- `notification_service.{h,cpp}`: Desktop notification server.
+- `brightness_service.{h,cpp}`: Backlight level and control.
+- `audio_service.{h,cpp}`: Audio devices, streams, volume and mute.
+- `media_service.{h,cpp}`: Media player state and playback control.
+- `battery_service.{h,cpp}`: Battery state.
 
 ## `test/`
 
-- `main.cpp`: Plain check runner for `astralia-shell-test`; covers clock timing, CLI, runtime paths, help, `color()`, status icons, workspace row, wallpaper cover and config, launcher search, parsing, URLs, ranking, submenus, logout, polkit and notification layout, network and Bluetooth change messages, `audio_percent()` and slider percent.
+- `main.cpp`: Unit tests for pure logic.

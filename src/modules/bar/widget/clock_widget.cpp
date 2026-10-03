@@ -6,6 +6,8 @@
 
 #include "modules/bar/widget/clock_widget.h"
 
+#include "render/icons.h"
+
 namespace astralia {
 
 std::chrono::milliseconds ms_until_next_second(std::chrono::system_clock::time_point now) {
@@ -13,7 +15,7 @@ std::chrono::milliseconds ms_until_next_second(std::chrono::system_clock::time_p
     return std::chrono::ceil<std::chrono::milliseconds>(next - now);
 }
 
-ClockWidget::ClockWidget() : BarWidget(LabelMode::always) {}
+ClockWidget::ClockWidget() { set_icon(icon::clock); }
 
 bool ClockWidget::refresh() {
     std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());

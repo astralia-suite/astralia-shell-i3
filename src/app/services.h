@@ -9,6 +9,7 @@
 #include "service/bluetooth_service.h"
 #include "service/brightness_service.h"
 #include "service/i3_service.h"
+#include "service/media_service.h"
 #include "service/network_service.h"
 #include "service/notification_service.h"
 #include "service/polkit_service.h"
@@ -30,6 +31,7 @@ struct Services {
     NotificationService notifications;
     PolkitService polkit;
     AudioService audio;
+    MediaService media;
 };
 
 } // namespace astralia

@@ -70,6 +70,7 @@ inline constexpr const char *mic_off = "\ued16";
 inline constexpr const char *mic_on = "\ueaf0";
 
 inline constexpr const char *music_note = "\ueafc";
+inline constexpr const char *clock = "\uea70";
 inline constexpr const char *wave_sine = "\uea59";
 inline constexpr const char *player_next = "\ued4b";
 inline constexpr const char *player_pause = "\ued45";

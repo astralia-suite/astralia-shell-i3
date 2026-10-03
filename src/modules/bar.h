@@ -28,8 +28,11 @@ class BluetoothPanel;
 class BluetoothWidget;
 class BrightnessPanel;
 class BrightnessWidget;
+class ClockPanel;
 class ClockWidget;
 class LogoutWidget;
+class MediaPanel;
+class MediaWidget;
 class NetworkPanel;
 class NetworkWidget;
 class PanelWindow;
@@ -53,11 +56,13 @@ class Bar {
         bool contains(int px) const { return px >= x && px < x + width; }
     };
 
-    enum Item : std::size_t { bluetooth,
-                              network,
-                              brightness,
+    enum Item : std::size_t { network,
+                              bluetooth,
                               volume,
+                              brightness,
                               battery,
+                              media,
+                              clock,
                               item_count };
 
     void set_hints(const OutputGeometry &output);
@@ -65,7 +70,6 @@ class Bar {
     void paint_panel();
     void draw_divider(const Rect &left, const Rect &right);
     void draw_all();
-    void draw_clock();
     void redraw_clock();
     void refresh(Item item);
     void notify(const std::string &app, const StatusMessage &message);
@@ -81,7 +85,6 @@ class Bar {
     void start_linger();
     void sync_hover();
     std::chrono::milliseconds until_linger_end() const;
-    Rect clock_rect() const;
 
     XConnection &x_;
     EventLoop &loop_;
@@ -93,6 +96,7 @@ class Bar {
     XWindow window_;
     std::unique_ptr<sdbus::IProxy> notifier_;
     std::unique_ptr<ClockWidget> clock_;
+    std::unique_ptr<MediaWidget> media_;
     std::unique_ptr<LogoutWidget> logout_;
     std::unique_ptr<BluetoothWidget> bluetooth_;
     std::unique_ptr<NetworkWidget> network_;
@@ -106,7 +110,8 @@ class Bar {
     std::unique_ptr<BluetoothPanel> bluetooth_panel_;
     std::unique_ptr<BrightnessPanel> brightness_panel_;
     std::unique_ptr<NetworkPanel> network_panel_;
-    Rect clock_rect_{};
+    std::unique_ptr<MediaPanel> media_panel_;
+    std::unique_ptr<ClockPanel> clock_panel_;
     Rect logout_rect_{};
     Rect workspace_rect_{};
     std::chrono::steady_clock::time_point linger_until_{};
