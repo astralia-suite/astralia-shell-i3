@@ -371,6 +371,9 @@ void NetworkPanel::paint() {
                 bool busy = network_.connecting_to() == info.ssid;
                 bool portal = info.connected && network_.status().portal;
                 bool can_forget = info.existing && !info.connected && !busy;
+                const char *action_icon = info.connected ? icon::network_disconnect
+                                          : busy         ? nullptr
+                                                         : icon::network_connect;
                 std::string subtitle = busy            ? "Connecting\xE2\x80\xA6"
                                        : portal        ? "Sign in required"
                                        : secured(info) ? info.security
@@ -381,11 +384,18 @@ void NetworkPanel::paint() {
                 const Color &foreground = portal           ? palette::warn
                                           : info.connected ? palette::accent
                                                            : palette::text;
-                double reserve = can_forget ? panel_config::button_size + 8.0 : 0.0;
+                constexpr double slot = panel_config::button_size + 8.0;
+                double reserve = slot * ((can_forget ? 1 : 0) + (action_icon != nullptr ? 1 : 0));
                 panel_draw_device_row(cr, rect, network_signal_icon(info.signal), info.ssid, subtitle, background, foreground, reserve);
+                double button_x = rect.x + rect.w - reserve;
+                double button_y = rect.y + (rect.h - panel_config::button_size) / 2.0;
                 if (can_forget) {
-                    PanelRect button = panel_draw_icon_button(cr, rect.x + rect.w - reserve, rect.y + (rect.h - panel_config::button_size) / 2.0, icon::close, palette::text_muted);
+                    PanelRect button = panel_draw_icon_button(cr, button_x, button_y, icon::close, palette::text_muted);
                     hits_.push_back({panel_intersect(button, area), forget, info.ssid});
+                    button_x += slot;
+                }
+                if (action_icon != nullptr) {
+                    panel_draw_icon_button(cr, button_x, button_y, action_icon, foreground);
                 }
                 hits_.push_back({panel_intersect(rect, area), network, info.ssid});
                 break;

@@ -52,6 +52,8 @@ inline constexpr const char *close = "\ueb55";
 inline constexpr const char *code = "\uea77";
 inline constexpr const char *link = "\ueade";
 inline constexpr const char *refresh = "\ueb13";
+inline constexpr const char *network_connect = "\ueba7";
+inline constexpr const char *network_disconnect = "\ueba8";
 
 inline constexpr const char *dashboard = "\uec42";
 inline constexpr const char *cpu = "\uef8e";
