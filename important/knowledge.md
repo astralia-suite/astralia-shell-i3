@@ -1,4 +1,4 @@
-# Development critical knowledge
+# Development knowledge
 
 ## Description
 

@@ -13,7 +13,7 @@ std::chrono::milliseconds ms_until_next_second(std::chrono::system_clock::time_p
     return std::chrono::ceil<std::chrono::milliseconds>(next - now);
 }
 
-ClockWidget::ClockWidget() : text_(bar_config::font) {}
+ClockWidget::ClockWidget() : BarWidget(LabelMode::always) {}
 
 bool ClockWidget::refresh() {
     std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
@@ -21,7 +21,7 @@ bool ClockWidget::refresh() {
     localtime_r(&now, &local);
     char buffer[64]{};
     std::size_t length = std::strftime(buffer, sizeof buffer, bar_config::clock_format, &local);
-    return text_.set(std::string_view(buffer, length));
+    return set_label(std::string_view(buffer, length));
 }
 
 } // namespace astralia

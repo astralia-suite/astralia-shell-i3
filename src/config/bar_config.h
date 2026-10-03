@@ -30,12 +30,12 @@ inline constexpr int pill_spacing = 6;
 inline constexpr double divider_height_ratio = 0.4;
 inline constexpr double divider_width = 1.0;
 
-// Control center
-inline constexpr int control_center_row_height = 40;
-inline constexpr int control_center_icon_slot = 28;
-inline constexpr int control_center_gap = 12;
-inline constexpr int control_center_wheel_step = 5;
-inline constexpr const char *control_center_percent_sample = "muted";
+// Brightness panel
+inline constexpr int brightness_row_height = 40;
+inline constexpr int brightness_icon_slot = 28;
+inline constexpr int brightness_gap = 12;
+inline constexpr int brightness_wheel_step = 5;
+inline constexpr const char *brightness_percent_sample = "100%";
 
 // Panels
 inline constexpr int panel_width = 360;

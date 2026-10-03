@@ -16,10 +16,11 @@
 #include "core/runtime_paths.h"
 
 #include "modules/bar/panel/battery_panel.h"
-#include "modules/bar/panel/control_center_panel.h"
 #include "modules/bar/panel/network_panel.h"
+#include "modules/bar/widget/battery_widget.h"
+#include "modules/bar/widget/bluetooth_widget.h"
 #include "modules/bar/widget/clock_widget.h"
-#include "modules/bar/widget/status_widget.h"
+#include "modules/bar/widget/network_widget.h"
 #include "modules/bar/widget/workspace_widget.h"
 #include "modules/launcher/app_icon.h"
 #include "modules/launcher/apps_provider.h"
@@ -399,7 +400,7 @@ void check_notification_layout() {
 
 } // namespace
 
-void check_control_center() {
+void check_slider() {
     using astralia::audio_percent;
     using astralia::slider_percent_at;
     std::array<float, 2> forty{0.064f, 0.064f};
@@ -482,7 +483,7 @@ int main() {
     check_polkit_layout();
     check_notification_layout();
     check_status_changes();
-    check_control_center();
+    check_slider();
     check_network_parse();
     check_status_panels();
     if (failures > 0) {

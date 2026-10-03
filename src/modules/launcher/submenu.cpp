@@ -1,5 +1,5 @@
-#include "modules/launcher/files_provider.h"
 #include "modules/launcher/submenu.h"
+#include "modules/launcher/files_provider.h"
 
 #include "render/icons.h"
 

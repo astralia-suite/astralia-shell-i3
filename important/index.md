@@ -60,7 +60,7 @@
 
 ## `src/config/`
 
-- `bar_config.h`: Bar geometry, corner radius, padding, border, pill sizes, divider and control center sizes, panel size, row/section/slider/empty heights, scroll step, placement and bar-only panel values (volume step, password minimum, `electro.png` echo), fonts, `strftime` clock format, 50 ms panel-close linger and `malloc_trim` interval.
+- `bar_config.h`: Bar geometry, corner radius, padding, border, pill sizes, divider and brightness panel sizes, panel size, row/section/slider/empty heights, scroll step, placement and bar-only panel values (volume step, password minimum, `electro.png` echo), fonts, `strftime` clock format, 50 ms panel-close linger and `malloc_trim` interval.
 - `logout_config.h`: Logout button ring geometry, Yuji Mai glyph font, logo file and the 8-entry glyph/command action table.
 - `launcher_config.h`: Launcher geometry, fonts, launch commands, search limits, and result, submenu and visit plain types.
 - `polkit_config.h`: Polkit card geometry, line heights, fonts, prompt texts and echo glyph file.
@@ -70,7 +70,7 @@
 
 ## `src/modules/`
 
-- `bar.{h,cpp}`: Top dock with inset pill-shaped panel, EWMH hints and strut; subscribes to shared i3, network, Bluetooth and battery services; logout and workspaces left, clock center, status and control center right, 1 px dividers between widget groups; logout click dispatches `logout` IPC, control center click toggles its panel, Bluetooth, network, volume and battery status items toggle their panels; opening a panel or clicking elsewhere on the bar closes the others, a status item stays expanded while its panel is open and lingers 50 ms after close before re-checking the pointer; sends status-change `Notify` on the session bus; periodic `malloc_trim`.
+- `bar.{h,cpp}`: Top dock with inset pill-shaped panel, EWMH hints and strut; subscribes to shared i3, network, Bluetooth and battery services; logout and workspaces left, clock center, status items right (Bluetooth, network, brightness, volume, battery), laid out right to left, 1 px dividers between widget groups; logout click dispatches `logout` IPC, each status item toggles its panel; opening a panel or clicking elsewhere on the bar closes the others, a status item stays expanded while its panel is open and lingers 50 ms after close before re-checking the pointer; sends status-change `Notify` on the session bus; periodic `malloc_trim`.
 - `launcher.{h,cpp}`: `launcher` / `launcher global` IPC toggle; override-redirect overlay on the pointer's output; takes input focus, closes on focus loss; `malloc_trim` on close.
 - `logout.{h,cpp}`: `logout` IPC toggle; override-redirect overlay on the pointer's output with 8 glyph buttons around the logo; keys, hover, click run actions.
 - `notification.{h,cpp}`: Subscribes to the shared `NotificationService`; unfocusable override-redirect card stack at the pointer output's bottom right; top-right x dismisses a card.
@@ -80,11 +80,15 @@
 
 ## `src/modules/bar/widget/`
 
-- `control_center_widget.{h,cpp}`: `icon::adjustments` button at the bar's right end.
-- `clock_widget.{h,cpp}`: Local date and time text (`Mon 1970-01-01 00:00:00`) and `ms_until_next_second()` for per-second redraws.
-- `logout_widget.{h,cpp}`: `icon::power` button with a `Logout` label shown only while hovered.
+- `bar_widget.h`: `BarWidget`, a `WidgetCapsule` styled with the bar's fonts and label gap; base of every bar widget except workspaces.
+- `clock_widget.{h,cpp}`: Capsule with always-shown local date and time text (`Mon 1970-01-01 00:00:00`) and `ms_until_next_second()` for per-second redraws.
+- `logout_widget.{h,cpp}`: Capsule with `icon::power` and a `Logout` label shown only while hovered.
 - `workspace_widget.{h,cpp}`: Pill row (active wider, accent), `workspace_row_width()` and click hit-test `workspace_at()`.
-- `status_widget.{h,cpp}`: Bluetooth, network, volume and battery icons; `item_at()` maps an x offset to a `StatusItem`; device, `Idle` or `Disabled`, SSID, percent or `Plugged in` label shown while hovered or while `pin()`ed by its open panel; pure selection functions.
+- `bluetooth_widget.{h,cpp}`: `BluetoothWidget` capsule with device, `Idle` or `Disabled` label; pure `bluetooth_icon()`, `bluetooth_label()`.
+- `network_widget.{h,cpp}`: `NetworkWidget` capsule with SSID label; pure `network_icon()`.
+- `brightness_widget.{h,cpp}`: `BrightnessWidget` capsule with percent label, hidden without a backlight.
+- `volume_widget.{h,cpp}`: `VolumeWidget` capsule with percent or `Muted` label.
+- `battery_widget.{h,cpp}`: `BatteryWidget` capsule with percent or `Plugged in` label; pure `battery_icon()`, `battery_label()`.
 
 ## `src/render/`
 
@@ -93,6 +97,7 @@
 - `icons.h`: `icon::` Tabler glyph codepoints as UTF-8 strings; `volume_threshold()` and `brightness_threshold()` level icons, as in `hl`.
 - `app_fonts.{h,cpp}`: Idempotent `register_app_fonts()` adds the icon, text and Yuji Mai fonts to fontconfig from the install or source dir.
 - `image_decode.{h,cpp}`: `SurfacePtr` and `decode_image()`: `stb_image` rasters or `resvg` SVGs into premultiplied cairo surfaces, optionally fit to a size.
+- `widget_capsule.{h,cpp}`: `WidgetCapsule` with a `CapsuleStyle` (fonts, label gap): optional icon and label strings, `LabelMode` `on_hover` or `always`, visible, hovered and pinned flags, width, draw and ink-centered label draw.
 - `draw.{h,cpp}`: `set_source()` and `rounded_rect()` cairo helpers shared by every module.
 - `x_window.{h,cpp}`: `XWindow`: 32-bit (or root-depth fallback) window with own colormap, name and class, GC, lazily sized pixmap and cairo context (`place()`, `release()`), raise/map with optional focus take (`show()`, `focus()`), unmap with focus restore (`hide()`), `clear()`, `present()`; optional override-redirect.
 - `panel_chrome.{h,cpp}`: `panel_config::` shared panel geometry and fonts; shared panel drawing on cairo: card, header with close button, toggle, icon button, section label, device row, centered message, confirm card; `PanelRect`/`PanelHit` click regions; pure `panel_clamp_scroll()`, `panel_intersect()`, `panel_hit_at()`.
@@ -101,7 +106,7 @@
 
 ## `src/modules/bar/panel/`
 
-- `control_center_panel.{h,cpp}`: Panel-width card with `Control Center` header, brightness and volume sliders (click, drag, wheel) on a `PanelWindow`, following live service changes.
+- `brightness_panel.{h,cpp}`: Panel-width card with `Brightness` header and one slider (click, drag, wheel) on a `PanelWindow`, following live service changes.
 - `audio_panel.{h,cpp}`: Output and input sliders, per-application playback sliders, output and input device lists (click sets the default); drag, wheel and `Left`/`Right` step volume; mute buttons.
 - `battery_panel.{h,cpp}`: UPower display-device row: state, time to full or empty, colored charge bar and percent; `No battery detected` otherwise; pure `battery_time_left()`, `battery_state_label()`.
 - `bluetooth_panel.{h,cpp}`: Power toggle, Connected / Paired / Nearby device rows; click connects, pairs or asks to disconnect, forget button asks to forget; discovery runs while open.

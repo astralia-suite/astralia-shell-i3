@@ -15,12 +15,15 @@
 #include "modules/bar/panel/audio_panel.h"
 #include "modules/bar/panel/battery_panel.h"
 #include "modules/bar/panel/bluetooth_panel.h"
-#include "modules/bar/panel/control_center_panel.h"
+#include "modules/bar/panel/brightness_panel.h"
 #include "modules/bar/panel/network_panel.h"
+#include "modules/bar/widget/battery_widget.h"
+#include "modules/bar/widget/bluetooth_widget.h"
+#include "modules/bar/widget/brightness_widget.h"
 #include "modules/bar/widget/clock_widget.h"
-#include "modules/bar/widget/control_center_widget.h"
 #include "modules/bar/widget/logout_widget.h"
-#include "modules/bar/widget/status_widget.h"
+#include "modules/bar/widget/network_widget.h"
+#include "modules/bar/widget/volume_widget.h"
 #include "modules/bar/widget/workspace_widget.h"
 
 #include "render/app_fonts.h"
@@ -34,8 +37,12 @@ Bar::Bar(XConnection &x, EventLoop &loop, IpcServer &ipc, Services &services)
     register_app_fonts();
     clock_ = std::make_unique<ClockWidget>();
     logout_ = std::make_unique<LogoutWidget>();
-    status_ = std::make_unique<StatusWidget>();
-    control_center_ = std::make_unique<ControlCenterWidget>();
+    bluetooth_ = std::make_unique<BluetoothWidget>();
+    network_ = std::make_unique<NetworkWidget>();
+    brightness_ = std::make_unique<BrightnessWidget>();
+    volume_ = std::make_unique<VolumeWidget>();
+    battery_ = std::make_unique<BatteryWidget>();
+    items_ = {bluetooth_.get(), network_.get(), brightness_.get(), volume_.get(), battery_.get()};
     OutputGeometry output = x_.primary_output();
     width_ = output.width;
     height_ = bar_config::margin_top + bar_config::height;
@@ -47,31 +54,34 @@ Bar::Bar(XConnection &x, EventLoop &loop, IpcServer &ipc, Services &services)
     notifier_ =
         services_.session.proxy("org.freedesktop.Notifications", "/org/freedesktop/Notifications");
     services_.i3.changed.connect([this] { draw_all(); });
-    services_.bluetooth.changed.connect([this] { redraw_status(); });
+    auto update = [this](Item item) {
+        refresh(item);
+        draw_all();
+    };
+    services_.bluetooth.changed.connect([update] { update(bluetooth); });
     services_.bluetooth.messages.connect(
         [this](const StatusMessage &message) { notify("Bluetooth", message); });
-    services_.network.changed.connect([this] { redraw_status(); });
+    services_.network.changed.connect([update] { update(network); });
     services_.network.messages.connect(
         [this](const StatusMessage &message) { notify("Network", message); });
-    services_.audio.changed.connect([this](AudioKind kind) {
+    services_.audio.changed.connect([update](AudioKind kind) {
         if (kind == AudioKind::sink) {
-            redraw_status();
+            update(volume);
         }
     });
-    services_.battery.changed.connect([this] { redraw_status(); });
-    control_center_panel_ = std::make_unique<ControlCenterPanel>(x_, loop, services_);
+    services_.battery.changed.connect([update] { update(battery); });
+    services_.brightness.changed.connect([update] { update(brightness); });
+    brightness_panel_ = std::make_unique<BrightnessPanel>(x_, loop, services_.brightness);
     audio_panel_ = std::make_unique<AudioPanel>(x_, loop, services_.audio);
     battery_panel_ = std::make_unique<BatteryPanel>(x_, loop, services_.battery);
     bluetooth_panel_ = std::make_unique<BluetoothPanel>(x_, loop, services_.bluetooth);
     network_panel_ = std::make_unique<NetworkPanel>(x_, loop, services_.network);
-    for (PanelWindow *panel : {&control_center_panel_->window(), &bluetooth_panel_->window(), &network_panel_->window(),
-                               &audio_panel_->window(), &battery_panel_->window()}) {
-        panel->changed.connect([this] { sync_panels(); });
+    for (std::size_t i = 0; i < item_count; ++i) {
+        panel_window(static_cast<Item>(i)).changed.connect([this] { sync_panels(); });
+        refresh(static_cast<Item>(i));
     }
 
     clock_->refresh();
-    status_->update(services_.bluetooth.status(), services_.network.status(),
-                    services_.audio.sink(), services_.battery.status());
     draw_all();
 
     loop.on_window(window_.id(), [this](const xcb_generic_event_t &event) {
@@ -88,7 +98,6 @@ Bar::Bar(XConnection &x, EventLoop &loop, IpcServer &ipc, Services &services)
             hover(reinterpret_cast<const xcb_motion_notify_event_t &>(event).event_x);
             break;
         case XCB_LEAVE_NOTIFY:
-            // A panel's pointer grab sends a grab-mode leave while the cursor is still on the widget, and closing it can race a stray leave, so keep the widget expanded until the linger re-checks the real position.
             if (reinterpret_cast<const xcb_leave_notify_event_t &>(event).mode == XCB_NOTIFY_MODE_NORMAL &&
                 std::chrono::steady_clock::now() >= linger_until_) {
                 hover(std::nullopt);
@@ -174,21 +183,22 @@ void Bar::draw_all() {
     draw_clock();
 
     set_source(window_.cr(), palette::text);
-    int control_center_width = control_center_->width();
-    control_center_rect_ = {panel_.x + panel_.width - bar_config::padding_x - control_center_width,
-                            panel_.y, control_center_width, panel_.height};
-    control_center_->draw(window_.cr(), control_center_rect_.x, panel_.y, panel_.height);
-    int status_width = status_->width();
-    status_rect_ = {control_center_rect_.x - bar_config::group_gap - status_width, panel_.y,
-                    status_width, panel_.height};
-    status_->draw(window_.cr(), status_rect_.x, panel_.y, panel_.height);
-    draw_divider(status_rect_, control_center_rect_);
+    int right = panel_.x + panel_.width - bar_config::padding_x;
+    for (std::size_t i = item_count; i-- > 0;) {
+        WidgetCapsule &item = *items_[i];
+        int item_width = item.visible() ? item.width() : 0;
+        item_rects_[i] = {right - item_width, panel_.y, item_width, panel_.height};
+        if (item.visible()) {
+            item.draw(window_.cr(), item_rects_[i].x, panel_.y, panel_.height);
+            right -= item_width + bar_config::item_gap;
+        }
+    }
     window_.present(whole.x, whole.y, whole.width, whole.height);
 }
 
 void Bar::draw_clock() {
     set_source(window_.cr(), palette::text);
-    clock_->draw(window_.cr(), panel_.x + panel_.width / 2.0, panel_.y + panel_.height / 2.0);
+    clock_->draw_ink_centered(window_.cr(), panel_.x + panel_.width / 2.0, panel_.y + panel_.height / 2.0);
 }
 
 void Bar::redraw_clock() {
@@ -206,10 +216,66 @@ void Bar::redraw_clock() {
     window_.present(dirty.x, dirty.y, dirty.width, dirty.height);
 }
 
-void Bar::redraw_status() {
-    status_->update(services_.bluetooth.status(), services_.network.status(),
-                    services_.audio.sink(), services_.battery.status());
-    draw_all();
+void Bar::refresh(Item item) {
+    switch (item) {
+    case bluetooth:
+        bluetooth_->update(services_.bluetooth.status());
+        break;
+    case network:
+        network_->update(services_.network.status());
+        break;
+    case brightness:
+        brightness_->update(services_.brightness);
+        break;
+    case volume:
+        volume_->update(services_.audio.sink());
+        break;
+    case battery:
+        battery_->update(services_.battery.status());
+        break;
+    case item_count:
+        break;
+    }
+}
+
+PanelWindow &Bar::panel_window(Item item) {
+    switch (item) {
+    case bluetooth:
+        return bluetooth_panel_->window();
+    case network:
+        return network_panel_->window();
+    case brightness:
+        return brightness_panel_->window();
+    case volume:
+        return audio_panel_->window();
+    case battery:
+    case item_count:
+        break;
+    }
+    return battery_panel_->window();
+}
+
+void Bar::toggle_panel(Item item) {
+    close_panels_except(&panel_window(item));
+    switch (item) {
+    case bluetooth:
+        bluetooth_panel_->toggle();
+        break;
+    case network:
+        network_panel_->toggle();
+        break;
+    case brightness:
+        brightness_panel_->toggle();
+        break;
+    case volume:
+        audio_panel_->toggle();
+        break;
+    case battery:
+        battery_panel_->toggle();
+        break;
+    case item_count:
+        break;
+    }
 }
 
 void Bar::notify(const std::string &app, const StatusMessage &message) {
@@ -233,29 +299,8 @@ void Bar::click(const xcb_button_press_event_t &event) {
         return;
     }
     start_linger();
-    auto toggle_only = [this](auto &panel) {
-        close_panels_except(&panel.window());
-        panel.toggle();
-    };
-    if (control_center_rect_.contains(event.event_x)) {
-        toggle_only(*control_center_panel_);
-    } else if (std::optional<StatusItem> item = status_rect_.contains(event.event_x)
-                                                    ? status_->item_at(event.event_x - status_rect_.x)
-                                                    : std::nullopt) {
-        switch (*item) {
-        case StatusItem::bluetooth:
-            toggle_only(*bluetooth_panel_);
-            break;
-        case StatusItem::network:
-            toggle_only(*network_panel_);
-            break;
-        case StatusItem::volume:
-            toggle_only(*audio_panel_);
-            break;
-        case StatusItem::battery:
-            toggle_only(*battery_panel_);
-            break;
-        }
+    if (std::optional<Item> item = item_at(event.event_x)) {
+        toggle_panel(*item);
     } else {
         close_panels_except(nullptr);
         if (logout_rect_.contains(event.event_x)) {
@@ -269,34 +314,45 @@ void Bar::click(const xcb_button_press_event_t &event) {
 }
 
 void Bar::close_panels_except(const PanelWindow *keep) {
-    for (PanelWindow *panel : {&control_center_panel_->window(), &bluetooth_panel_->window(), &network_panel_->window(),
-                               &audio_panel_->window(), &battery_panel_->window()}) {
-        if (panel != keep) {
-            panel->close();
+    for (std::size_t i = 0; i < item_count; ++i) {
+        if (PanelWindow &panel = panel_window(static_cast<Item>(i)); &panel != keep) {
+            panel.close();
         }
     }
 }
 
-std::optional<StatusItem> Bar::open_item() const {
-    if (bluetooth_panel_->window().is_open()) {
-        return StatusItem::bluetooth;
-    }
-    if (network_panel_->window().is_open()) {
-        return StatusItem::network;
-    }
-    if (audio_panel_->window().is_open()) {
-        return StatusItem::volume;
-    }
-    if (battery_panel_->window().is_open()) {
-        return StatusItem::battery;
+std::optional<Bar::Item> Bar::open_item() {
+    for (std::size_t i = 0; i < item_count; ++i) {
+        if (panel_window(static_cast<Item>(i)).is_open()) {
+            return static_cast<Item>(i);
+        }
     }
     return std::nullopt;
 }
 
-// Like hl, a status item stays expanded while its panel is open; on close it lingers briefly, then falls back to whether the cursor is on it.
+std::optional<Bar::Item> Bar::item_at(int x) const {
+    for (std::size_t i = 0; i < item_count; ++i) {
+        const Rect &rect = item_rects_[i];
+        if (items_[i]->visible() && x >= rect.x - bar_config::item_gap / 2 &&
+            x < rect.x + rect.width + bar_config::item_gap / 2) {
+            return static_cast<Item>(i);
+        }
+    }
+    return std::nullopt;
+}
+
+bool Bar::pin_open_item() {
+    std::optional<Item> open = open_item();
+    bool changed = false;
+    for (std::size_t i = 0; i < item_count; ++i) {
+        changed |= items_[i]->set_pinned(open == static_cast<Item>(i));
+    }
+    return changed;
+}
+
 void Bar::sync_panels() {
-    if (std::optional<StatusItem> item = open_item()) {
-        if (status_->pin(item)) {
+    if (open_item()) {
+        if (pin_open_item()) {
             draw_all();
         }
         return;
@@ -310,13 +366,12 @@ void Bar::start_linger() {
 }
 
 void Bar::hover(std::optional<int> x, bool redraw) {
-    std::optional<int> offset;
-    if (x && status_rect_.contains(*x)) {
-        offset = *x - status_rect_.x;
+    std::optional<Item> hovered = x && !open_item() ? item_at(*x) : std::nullopt;
+    bool changed = logout_->set_hovered(x && logout_rect_.contains(*x));
+    for (std::size_t i = 0; i < item_count; ++i) {
+        changed |= items_[i]->set_hovered(hovered == static_cast<Item>(i));
     }
-    bool logout_changed = logout_->hover(x && logout_rect_.contains(*x));
-    bool status_changed = status_->hover(offset);
-    if (logout_changed || status_changed || redraw) {
+    if (changed || redraw) {
         draw_all();
     }
 }
@@ -333,7 +388,7 @@ void Bar::sync_hover() {
     bool inside = reply->same_screen && reply->win_x >= 0 && reply->win_y >= 0 && reply->win_x < width_ && reply->win_y < height_;
     int x = reply->win_x;
     free(reply);
-    bool pinned = status_->pin(open_item());
+    bool pinned = pin_open_item();
     hover(inside ? std::optional<int>(x) : std::nullopt, pinned);
 }
 

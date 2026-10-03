@@ -11,7 +11,6 @@ constexpr int knob_size = 12;
 constexpr double focus_ring = 2.0;
 } // namespace
 
-// The knob centre travels from knob/2 to width - knob/2, so the knob never leaves the track and the fill always ends under it.
 int slider_percent_at(int track_x, int track_width, int px) {
     constexpr int inset = knob_size / 2;
     int span = track_width - 2 * inset;

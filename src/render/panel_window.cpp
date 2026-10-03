@@ -73,7 +73,6 @@ void PanelWindow::clear() {
 
 void PanelWindow::present() { window_.present(); }
 
-// Grab with owner_events so clicks on our own windows (bar, panels) arrive as usual while presses anywhere else land here with outside coordinates. Deferred to the first expose because grabbing an unviewable window fails.
 void PanelWindow::grab() {
     constexpr uint16_t mask = XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE | XCB_EVENT_MASK_BUTTON_1_MOTION;
     xcb_grab_pointer_reply_t *reply = xcb_grab_pointer_reply(
