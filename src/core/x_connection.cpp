@@ -183,23 +183,30 @@ std::vector<Output> XConnection::outputs() const {
     return result;
 }
 
-OutputGeometry XConnection::pointer_output() const {
-    xcb_query_pointer_reply_t *reply =
-        xcb_query_pointer_reply(conn(), xcb_query_pointer(conn(), root()), nullptr);
-    OutputGeometry fallback = primary_output();
-    if (reply == nullptr) {
-        return fallback;
-    }
-    int px = reply->root_x;
-    int py = reply->root_y;
-    free(reply);
+OutputGeometry XConnection::output_containing(int x, int y) const {
     for (const Output &output : outputs()) {
         const OutputGeometry &g = output.geometry;
-        if (px >= g.x && px < g.x + g.width && py >= g.y && py < g.y + g.height) {
+        if (x >= g.x && x < g.x + g.width && y >= g.y && y < g.y + g.height) {
             return g;
         }
     }
-    return fallback;
+    return primary_output();
+}
+
+std::pair<int, int> XConnection::pointer_position() const {
+    xcb_query_pointer_reply_t *reply =
+        xcb_query_pointer_reply(conn(), xcb_query_pointer(conn(), root()), nullptr);
+    if (reply == nullptr) {
+        return {0, 0};
+    }
+    std::pair<int, int> position{reply->root_x, reply->root_y};
+    free(reply);
+    return position;
+}
+
+OutputGeometry XConnection::pointer_output() const {
+    auto [x, y] = pointer_position();
+    return output_containing(x, y);
 }
 
 } // namespace astralia

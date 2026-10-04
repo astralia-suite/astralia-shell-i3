@@ -44,7 +44,6 @@ class ClockPanel {
     void handle(const xcb_generic_event_t &event);
     void paint();
 
-    XConnection &x_;
     PanelWindow window_;
     std::vector<PanelHit> hits_;
     int month_offset_ = 0;

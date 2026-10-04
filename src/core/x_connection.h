@@ -6,6 +6,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 #include <xcb/xcb.h>
 #include <xcb/xcb_ewmh.h>
@@ -41,7 +42,9 @@ class XConnection {
     xcb_atom_t atom(std::string_view name);
     OutputGeometry primary_output() const;
     std::vector<Output> outputs() const;
+    OutputGeometry output_containing(int x, int y) const;
     OutputGeometry pointer_output() const;
+    std::pair<int, int> pointer_position() const;
 
   private:
     struct Disconnect {

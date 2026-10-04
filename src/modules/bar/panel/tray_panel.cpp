@@ -191,7 +191,7 @@ void TrayMenu::paint() {
     constexpr double row_pad = bar_config::tray_menu_row_padding;
     const std::vector<TrayMenuEntry> *entries = level();
     bool show_back = !path_.empty();
-    OutputGeometry output = x_.primary_output();
+    OutputGeometry output = x_.output_containing(anchor_x_, anchor_y_);
     int height = std::min(tray_menu_height(entries, show_back), static_cast<int>(output.height));
     int x = std::clamp(anchor_x_, static_cast<int>(output.x), output.x + output.width - width);
     int y = std::clamp(anchor_y_, static_cast<int>(output.y), output.y + output.height - height);

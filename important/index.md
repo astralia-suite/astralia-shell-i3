@@ -53,7 +53,9 @@
 - `x_connection.{h,cpp}`: X connection with screen, visuals, atoms, EWMH and RandR outputs.
 - `event_loop.{h,cpp}`: Main loop for X events, signals, timers and file descriptors.
 - `keyboard.{h,cpp}`: Translates key presses to text and editing keys.
+- `allocator.{h,cpp}`: Limits `malloc` to one arena and maps large buffers separately so they return to the system.
 - `async_process.{h,cpp}`: Runs a child process and returns its output on the main thread.
+- `config_file.{h,cpp}`: Parses and edits `key = value` files, writes them atomically and watches their directory.
 - `spawn.{h,cpp}`: Launches detached shell commands.
 - `signal.h`: Change notifications from services to modules.
 - `dbus.{h,cpp}`: System and session D-Bus connections, matches, proxies and property reads.
@@ -67,16 +69,19 @@
 - `notification_config.h`: Notification card and stack constants.
 - `osd_config.h`: OSD pill constants and timings.
 - `wallpaper_config.h`: Wallpaper config file location and wildcard key.
+- `settings_config.h`: Settings file, defaults, overlay, tab, chip, tile and thumbnail grid constants.
 
 ## `src/modules/`
 
-- `bar.{h,cpp}`: Top bar with logout, workspaces, media, clock, tray and status widgets; opens their panels.
+- `bar.{h,cpp}`: Top bar on one output with logout, workspaces, media, clock, tray and status widgets; opens their panels.
+- `bar_set.{h,cpp}`: Keeps one bar per enabled output, moving or hiding bars on output and settings changes.
 - `launcher.{h,cpp}`: App, file and command launcher overlay.
 - `logout.{h,cpp}`: Logout overlay with power action buttons.
 - `notification.{h,cpp}`: Desktop notification cards.
 - `polkit.{h,cpp}`: Polkit password prompt.
 - `osd.{h,cpp}`: Brightness, volume and mic level popup.
 - `wallpaper.{h,cpp}`: Per-output desktop wallpaper.
+- `settings.{h,cpp}`: Settings overlay with the Displays and Wallpaper tabs.
 
 ## `src/modules/bar/widget/`
 
@@ -126,10 +131,13 @@
 
 - `layout.{h,cpp}`: Polkit card height and password dot count.
 
-## `src/modules/wallpaper/`
+## `src/modules/settings/`
 
-- `config_file.{h,cpp}`: Reads the wallpaper config file.
-- `image.{h,cpp}`: Loads and fits wallpaper images.
+- `layout.{h,cpp}`: Settings card size, rail tabs, chip row and thumbnail grid geometry and hit-testing.
+- `widgets.{h,cpp}`: Output chip row and toggle tile drawing.
+- `displays_tab.{h,cpp}`: Per-output bar, OSD and notification toggles with default override.
+- `wallpaper_tab.{h,cpp}`: Folder field, image grid and per-output wallpaper picking.
+- `thumbnail_cache.{h,cpp}`: Loads visible wallpaper thumbnails on a worker thread through the cover cache.
 
 ## `src/render/`
 
@@ -138,17 +146,21 @@
 - `icons.h`: Icon glyph codepoints and level icon pickers.
 - `app_fonts.{h,cpp}`: Registers the bundled fonts.
 - `app_icon.{h,cpp}`: Finds and loads application icons from the icon theme.
-- `image_decode.{h,cpp}`: Decodes raster and SVG images.
+- `image_decode.{h,cpp}`: Decodes raster and SVG images, JPEGs at reduced size, and crops covers to a box.
+- `cover_cache.{h,cpp}`: Loads images cropped to a box size from an on-disk PNG cache, pruned by age and size.
 - `widget_capsule.{h,cpp}`: Icon and label widget with hover-revealed label.
 - `draw.{h,cpp}`: Shared cairo drawing helpers.
 - `x_window.{h,cpp}`: Drawable X window.
 - `panel_chrome.{h,cpp}`: Shared panel constants and drawing pieces.
 - `slider.{h,cpp}`: Draws sliders and maps clicks to percent.
-- `panel_window.{h,cpp}`: Popup window for bar panels.
+- `panel_window.{h,cpp}`: Popup window for bar panels, anchored to its bar's output.
 
 ## `src/service/`
 
 - `i3_service.{h,cpp}`: i3 workspace state and switching.
+- `output_service.{h,cpp}`: RandR output list and change notifications.
+- `settings_service.{h,cpp}`: Creates, reads, writes and watches `settings.conf`.
+- `wallpaper_service.{h,cpp}`: Reads, writes and watches `wallpaper.conf`.
 - `bluetooth_service.{h,cpp}`: Bluetooth adapter and device state and control.
 - `network_service.{h,cpp}`: Network state and Wi-Fi control.
 - `polkit_service.{h,cpp}`: Polkit authentication agent.

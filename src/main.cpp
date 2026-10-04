@@ -5,6 +5,7 @@
 
 #include "app/services.h"
 
+#include "core/allocator.h"
 #include "core/cli.h"
 #include "core/daemon.h"
 #include "core/event_loop.h"
@@ -14,15 +15,17 @@
 #include "core/single_instance.h"
 #include "core/x_connection.h"
 
-#include "modules/bar.h"
+#include "modules/bar_set.h"
 #include "modules/launcher.h"
 #include "modules/logout.h"
 #include "modules/notification.h"
 #include "modules/osd.h"
 #include "modules/polkit.h"
+#include "modules/settings.h"
 #include "modules/wallpaper.h"
 
 int main(int argc, char **argv) {
+    astralia::tune_allocator();
     std::signal(SIGPIPE, SIG_IGN);
     std::vector<std::string_view> args(argv + 1, argv + argc);
     astralia::Invocation invocation = astralia::parse_invocation(args);
@@ -53,12 +56,13 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
     astralia::Services services(*x, *loop);
-    astralia::Wallpaper wallpaper(*x, *loop);
-    astralia::Bar bar(*x, *loop, **ipc, services);
+    astralia::Wallpaper wallpaper(*x, services);
+    astralia::BarSet bars(*x, *loop, **ipc, services);
     astralia::Launcher launcher(*x, *loop, **ipc);
     astralia::Logout logout(*x, *loop, **ipc);
     astralia::Polkit polkit(*x, *loop, services);
     astralia::Notifications notifications(*x, *loop, services);
     astralia::Osd osd(*x, *loop, services);
+    astralia::Settings settings(*x, *loop, **ipc, services);
     return loop->run();
 }

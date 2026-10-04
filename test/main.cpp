@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "core/cli.h"
+#include "core/config_file.h"
 #include "core/ipc.h"
 #include "core/runtime_paths.h"
 
@@ -35,8 +36,13 @@
 #include "modules/logout/layout.h"
 #include "modules/notification/layout.h"
 #include "modules/polkit/layout.h"
-#include "modules/wallpaper/config_file.h"
-#include "modules/wallpaper/image.h"
+#include "modules/settings/layout.h"
+
+#include "render/cover_cache.h"
+#include "render/image_decode.h"
+
+#include "service/settings_service.h"
+#include "service/wallpaper_service.h"
 
 #include "render/app_icon.h"
 #include "render/icons.h"
@@ -224,14 +230,6 @@ void check_cover() {
 
 void check_wallpaper_file() {
     using astralia::image_for;
-    check(astralia::wallpaper_file_path("/cfg", "/home/u") == "/cfg/astralia-shell/wallpaper.conf",
-          "XDG_CONFIG_HOME wins");
-    check(astralia::wallpaper_file_path("", "/home/u") ==
-              "/home/u/.config/astralia-shell/wallpaper.conf",
-          "empty XDG_CONFIG_HOME falls back to ~/.config");
-    check(astralia::expand_home("~/a.png", "/home/u") == "/home/u/a.png", "~/ expands");
-    check(astralia::expand_home("/a/~b.png", "/home/u") == "/a/~b.png", "inner ~ is kept");
-
     astralia::WallpaperFile file = astralia::parse_wallpaper_file("# comment\n"
                                                                   "\n"
                                                                   "LVDS-1 = ~/laptop.jpg\n"
@@ -246,6 +244,122 @@ void check_wallpaper_file() {
     check(file.invalid_lines == std::vector<std::size_t>{5, 7}, "malformed lines reported");
     check(!image_for(astralia::parse_wallpaper_file("", "/home/u"), "DP-1"),
           "empty file has no image");
+}
+
+void check_cover_cache() {
+    using astralia::cover_cache_name;
+    check(astralia::jpeg_reduction(0.0266) == 8, "a tiny target decodes at one eighth");
+    check(astralia::jpeg_reduction(0.125) == 8, "an exact eighth is allowed");
+    check(astralia::jpeg_reduction(0.2) == 4, "a fifth needs a quarter");
+    check(astralia::jpeg_reduction(0.5) == 2, "a half is allowed");
+    check(astralia::jpeg_reduction(0.6) == 1, "above a half decodes in full");
+    check(astralia::jpeg_reduction(1.0) == 1, "full scale decodes in full");
+
+    constexpr int64_t day = 24 * 3600;
+    constexpr uintmax_t mib = 1024 * 1024;
+    using Entries = std::vector<astralia::CoverCacheEntry>;
+    check(astralia::cover_cache_expired({}, 1000 * day).empty(), "an empty cache expires nothing");
+    check(astralia::cover_cache_expired(Entries{{"a.png", mib, 1000 * day}, {"b.png", mib, 999 * day}}, 1000 * day).empty(), "recent entries under the cap stay");
+    check(astralia::cover_cache_expired(Entries{{"old.png", mib, 900 * day}, {"new.png", mib, 999 * day}}, 1000 * day) == std::vector<std::string>{"old.png"}, "entries unused for 90 days expire");
+    check(astralia::cover_cache_expired(Entries{{"a.png", 70 * mib, 990 * day}, {"b.png", 70 * mib, 995 * day}, {"c.png", 70 * mib, 999 * day}}, 1000 * day) == std::vector<std::string>{"a.png", "b.png"}, "the least recently used go first over the cap");
+    check(astralia::cover_cache_expired(Entries{{"x.1.tmp", mib, 1000 * day - 7200}, {"y.2.tmp", mib, 1000 * day - 60}}, 1000 * day) == std::vector<std::string>{"x.1.tmp"}, "only stale temporary files expire");
+
+    std::string name = cover_cache_name("/w/a.jpg", 100, 5, 1920, 1200);
+    check(name.size() == 20 && name.ends_with(".png"), "cache names are a hash and .png");
+    check(name == cover_cache_name("/w/a.jpg", 100, 5, 1920, 1200), "the same input gives the same name");
+    check(name != cover_cache_name("/w/b.jpg", 100, 5, 1920, 1200), "a different path changes the name");
+    check(name != cover_cache_name("/w/a.jpg", 101, 5, 1920, 1200), "a different size changes the name");
+    check(name != cover_cache_name("/w/a.jpg", 100, 6, 1920, 1200), "a new mtime changes the name");
+    check(name != cover_cache_name("/w/a.jpg", 100, 5, 1920, 1080), "a different target changes the name");
+}
+
+void check_config_file() {
+    using astralia::config_file_path;
+    check(config_file_path("/cfg", "/home/u", "astralia-shell/wallpaper.conf") ==
+              "/cfg/astralia-shell/wallpaper.conf",
+          "XDG_CONFIG_HOME wins");
+    check(config_file_path("", "/home/u", "astralia-shell/wallpaper.conf") ==
+              "/home/u/.config/astralia-shell/wallpaper.conf",
+          "empty XDG_CONFIG_HOME falls back to ~/.config");
+    check(astralia::expand_home("~/a.png", "/home/u") == "/home/u/a.png", "~/ expands");
+    check(astralia::expand_home("/a/~b.png", "/home/u") == "/a/~b.png", "inner ~ is kept");
+
+    astralia::ConfigLines lines = astralia::parse_config_lines("# c\n a = 1 \nbad\n=x\nb=\n");
+    check(lines.entries.size() == 1 && lines.entries[0].key == "a" && lines.entries[0].value == "1" &&
+              lines.entries[0].line == 2,
+          "entries are trimmed and numbered");
+    check(lines.invalid == std::vector<std::size_t>{3, 4, 5}, "bad lines are reported");
+
+    std::string text = "# keep\na = 1\nother = 2\n";
+    check(astralia::with_entry(text, "a", "9") == "# keep\na = 9\nother = 2\n",
+          "an existing key is replaced in place");
+    check(astralia::with_entry(text, "c", "3") == "# keep\na = 1\nother = 2\nc = 3\n",
+          "a new key is appended");
+    check(astralia::with_entry("", "a", "1") == "a = 1\n", "an empty file gains the key");
+    check(astralia::without_entry(text, "a") == "# keep\nother = 2\n", "a key is removed");
+    check(astralia::without_entry(text, "zzz") == text, "a missing key changes nothing");
+}
+
+void check_settings_file() {
+    using astralia::Feature;
+    astralia::SettingsFile file = astralia::parse_settings_file(astralia::settings_config::default_text);
+    check(file.invalid_lines.empty(), "the default text parses cleanly");
+    check(astralia::feature_enabled(file, Feature::bar, "DP-1") &&
+              astralia::feature_enabled(file, Feature::osd, "DP-1") &&
+              astralia::feature_enabled(file, Feature::notifications, "DP-1"),
+          "defaults enable every feature");
+    check(file.wallpaper_dir == "~/Pictures", "default wallpaper folder");
+
+    file = astralia::parse_settings_file("bar = off\nHDMI-A-1.bar = on\nHDMI-A-1.osd = off\n"
+                                         "wallpaper_dir = /w\nosd = maybe\nfoo.baz = on\n.bar = on\n");
+    check(!astralia::feature_enabled(file, Feature::bar, "DP-1"), "the default can be off");
+    check(astralia::feature_enabled(file, Feature::bar, "HDMI-A-1"), "an override beats the default");
+    check(!astralia::feature_enabled(file, Feature::osd, "HDMI-A-1"), "an override can turn off");
+    check(astralia::feature_enabled(file, Feature::osd, "DP-1"), "other outputs keep the default");
+    check(file.wallpaper_dir == "/w", "wallpaper folder is read");
+    check(file.invalid_lines == std::vector<std::size_t>{5, 6, 7}, "bad values and keys are reported");
+    check(astralia::feature_key(Feature::notifications, "") == "notifications", "default key");
+    check(astralia::feature_key(Feature::osd, "DP-1") == "DP-1.osd", "override key");
+}
+
+void check_settings_layout() {
+    using namespace astralia;
+    check(settings_window_size(1920, 1080) == std::pair<int, int>{860, 540}, "a large output caps the card");
+    check(settings_window_size(600, 400) == std::pair<int, int>{520, 320}, "a small output leaves a margin");
+    SettingsGeometry geometry = settings_geometry(760, 540);
+    check(geometry.content.x == 190 && geometry.content.w == 550 && geometry.content.h == 500,
+          "content sits right of the rail inside the padding");
+    check(settings_tab_at(geometry, 20, geometry.rail.y + 12 + 44 + 10) == 0u, "first tab");
+    check(settings_tab_at(geometry, 20, geometry.rail.y + 12 + 44 + 36 + 4 + 10) == 1u, "second tab");
+    check(!settings_tab_at(geometry, 20, 5), "above the tabs");
+    check(!settings_tab_at(geometry, 400, 70), "right of the rail");
+
+    std::vector<PanelRect> chips = settings_chip_rects(3, {10, 20, 492, 400});
+    check(chips.size() == 3 && chips[0].x == 10 && chips[0].w == 160 && chips[1].x == 176 &&
+              chips[2].x + chips[2].w == 502 && chips[2].y == 20,
+          "chips split the row evenly and span it");
+    check(settings_chip_rects(0, {0, 0, 100, 100}).empty(), "no chips for no outputs");
+
+    PanelRect grid{0, 100, 635, 300};
+    check(settings_grid_content_height(0) == 0.0, "no images have no height");
+    check(settings_grid_width() == 635.0, "five columns with gaps");
+    check(settings_grid_content_height(5) == 115.0, "one row");
+    check(settings_grid_content_height(6) == 245.0, "two rows");
+    check(settings_clamp_scroll(-30, 30, 300) == 0.0, "scroll stops at the top");
+    check(settings_clamp_scroll(9999, 30, 300) == 6 * 130.0 - 15.0 - 300.0, "scroll stops at the bottom");
+    check(settings_clamp_scroll(50, 5, 300) == 0.0, "short content never scrolls");
+    PanelRect second = settings_grid_cell(grid, 6, 0);
+    check(second.x == 130.0 && second.y == 230.0, "cell 6 is on the second row");
+    check(settings_grid_cell(grid, 6, 100).y == 130.0, "scrolling moves cells up");
+    check(settings_grid_visible(grid, 30, 0) == std::pair<std::size_t, std::size_t>{0, 15},
+          "three rows are visible at the top");
+    check(settings_grid_visible(grid, 10, 0) == std::pair<std::size_t, std::size_t>{0, 10},
+          "visible range stops at the count");
+    check(settings_grid_visible(grid, 0, 0) == std::pair<std::size_t, std::size_t>{0, 0}, "empty grid");
+    check(settings_grid_cell_at(grid, 30, 0, 5, 105) == 0u, "hit the first cell");
+    check(!settings_grid_cell_at(grid, 30, 0, 120, 105), "the gap is no cell");
+    check(settings_grid_cell_at(grid, 30, 0, 135, 235) == 6u, "hit a cell on the second row");
+    check(!settings_grid_cell_at(grid, 30, 0, 5, 50), "outside the grid");
 }
 
 void check_launcher_text() {
@@ -527,6 +641,10 @@ int main() {
     check_workspace_row();
     check_cover();
     check_wallpaper_file();
+    check_config_file();
+    check_cover_cache();
+    check_settings_layout();
+    check_settings_file();
     check_launcher_text();
     check_launcher_modes();
     check_launcher_scoring();

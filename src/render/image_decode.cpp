@@ -1,8 +1,16 @@
 #include <algorithm>
+#include <array>
+#include <cctype>
 #include <cmath>
+#include <csetjmp>
 #include <cstdint>
+#include <cstdio>
+#include <filesystem>
+#include <functional>
+#include <jpeglib.h>
 #include <resvg/resvg.h>
 #include <string>
+#include <string_view>
 #include <vector>
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_NO_HDR
@@ -18,6 +26,17 @@ namespace {
 struct FreePixels {
     void operator()(stbi_uc *pixels) const { stbi_image_free(pixels); }
 };
+
+struct CloseFile {
+    void operator()(std::FILE *file) const { std::fclose(file); }
+};
+
+struct JpegError {
+    jpeg_error_mgr manager;
+    std::jmp_buf jump;
+};
+
+using RequiredScale = std::function<double(int, int)>;
 
 struct DestroyTree {
     void operator()(resvg_render_tree *tree) const { resvg_tree_destroy(tree); }
@@ -45,6 +64,23 @@ SurfacePtr to_surface(const uint8_t *rgba, int width, int height, bool premultip
     return surface;
 }
 
+SurfacePtr adopt_pixels(std::unique_ptr<stbi_uc, FreePixels> pixels, int width, int height) {
+    auto *words = reinterpret_cast<uint32_t *>(pixels.get());
+    const uint8_t *in = pixels.get();
+    for (std::size_t i = 0, count = static_cast<std::size_t>(width) * height; i < count; ++i, in += 4) {
+        uint8_t alpha = in[3];
+        words[i] = static_cast<uint32_t>(alpha) << 24 | premultiply(in[0], alpha) << 16 |
+                   premultiply(in[1], alpha) << 8 | premultiply(in[2], alpha);
+    }
+    SurfacePtr surface(cairo_image_surface_create_for_data(pixels.get(), CAIRO_FORMAT_ARGB32, width,
+                                                           height, width * 4));
+    static cairo_user_data_key_t key;
+    if (cairo_surface_set_user_data(surface.get(), &key, pixels.get(), [](void *data) { stbi_image_free(data); }) == CAIRO_STATUS_SUCCESS) {
+        pixels.release();
+    }
+    return surface;
+}
+
 double fit_scale(double width, double height, int fit_size) {
     return fit_size > 0 ? std::min(fit_size / width, fit_size / height) : 1.0;
 }
@@ -67,6 +103,56 @@ SurfacePtr scaled(SurfacePtr source, int fit_size) {
     cairo_paint(cr);
     cairo_destroy(cr);
     return target;
+}
+
+bool is_jpeg(const std::string &path) {
+    constexpr std::array<std::string_view, 3> extensions{".jpg", ".jpeg", ".jfif"};
+    std::string extension = std::filesystem::path(path).extension().string();
+    std::ranges::transform(extension, extension.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return std::ranges::find(extensions, extension) != extensions.end();
+}
+
+std::expected<SurfacePtr, std::string> decode_jpeg(const std::string &path, const RequiredScale &required_scale) {
+    std::unique_ptr<std::FILE, CloseFile> file(std::fopen(path.c_str(), "rb"));
+    if (!file) {
+        return std::unexpected(std::string("cannot open file"));
+    }
+    jpeg_decompress_struct decoder;
+    JpegError error;
+    decoder.err = jpeg_std_error(&error.manager);
+    error.manager.error_exit = [](j_common_ptr info) { std::longjmp(reinterpret_cast<JpegError *>(info->err)->jump, 1); };
+    error.manager.output_message = [](j_common_ptr) {};
+    cairo_surface_t *volatile surface = nullptr;
+    if (setjmp(error.jump) != 0) {
+        jpeg_destroy_decompress(&decoder);
+        cairo_surface_destroy(surface);
+        return std::unexpected(std::string("jpeg decode failed"));
+    }
+    jpeg_create_decompress(&decoder);
+    jpeg_stdio_src(&decoder, file.get());
+    jpeg_read_header(&decoder, TRUE);
+    decoder.out_color_space = JCS_EXT_BGRA;
+    decoder.scale_num = 1;
+    decoder.scale_denom = static_cast<unsigned>(jpeg_reduction(required_scale(static_cast<int>(decoder.image_width), static_cast<int>(decoder.image_height))));
+    jpeg_start_decompress(&decoder);
+    auto width = static_cast<int>(decoder.output_width);
+    auto height = static_cast<int>(decoder.output_height);
+    surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, width, height);
+    if (cairo_surface_status(surface) != CAIRO_STATUS_SUCCESS) {
+        jpeg_destroy_decompress(&decoder);
+        cairo_surface_destroy(surface);
+        return std::unexpected(std::string("cannot allocate surface"));
+    }
+    uint8_t *pixels = cairo_image_surface_get_data(surface);
+    int stride = cairo_image_surface_get_stride(surface);
+    while (decoder.output_scanline < decoder.output_height) {
+        JSAMPROW row = pixels + static_cast<std::size_t>(decoder.output_scanline) * stride;
+        jpeg_read_scanlines(&decoder, &row, 1);
+    }
+    jpeg_finish_decompress(&decoder);
+    jpeg_destroy_decompress(&decoder);
+    cairo_surface_mark_dirty(surface);
+    return SurfacePtr(surface);
 }
 
 std::expected<SurfacePtr, std::string> decode_svg(const std::string &path, int fit_size) {
@@ -92,9 +178,32 @@ std::expected<SurfacePtr, std::string> decode_svg(const std::string &path, int f
 
 } // namespace
 
+Placement cover(int image_width, int image_height, int area_width, int area_height) {
+    double scale = std::max(static_cast<double>(area_width) / image_width,
+                            static_cast<double>(area_height) / image_height);
+    return {scale, (area_width - image_width * scale) / 2.0,
+            (area_height - image_height * scale) / 2.0};
+}
+
+int jpeg_reduction(double required_scale) {
+    for (int reduction : {8, 4, 2}) {
+        if (1.0 / reduction >= required_scale) {
+            return reduction;
+        }
+    }
+    return 1;
+}
+
 std::expected<SurfacePtr, std::string> decode_image(const std::string &path, int fit_size) {
     if (path.ends_with(".svg")) {
         return decode_svg(path, fit_size);
+    }
+    if (is_jpeg(path)) {
+        auto image = decode_jpeg(path, [fit_size](int width, int height) { return fit_scale(width, height, fit_size); });
+        if (!image) {
+            return image;
+        }
+        return scaled(std::move(*image), fit_size);
     }
     int width = 0;
     int height = 0;
@@ -104,7 +213,32 @@ std::expected<SurfacePtr, std::string> decode_image(const std::string &path, int
     if (!pixels) {
         return std::unexpected(std::string(stbi_failure_reason()));
     }
-    return scaled(to_surface(pixels.get(), width, height, false), fit_size);
+    return scaled(adopt_pixels(std::move(pixels), width, height), fit_size);
+}
+
+std::expected<SurfacePtr, std::string> decode_cover(const std::string &path, int width, int height) {
+    std::expected<SurfacePtr, std::string> source;
+    if (is_jpeg(path)) {
+        source = decode_jpeg(path, [width, height](int image_width, int image_height) { return cover(image_width, image_height, width, height).scale; });
+    } else if (path.ends_with(".svg")) {
+        source = decode_svg(path, 2 * std::max(width, height));
+    } else {
+        source = decode_image(path);
+    }
+    if (!source) {
+        return source;
+    }
+    cairo_surface_t *image = source->get();
+    Placement placement = cover(cairo_image_surface_get_width(image), cairo_image_surface_get_height(image), width, height);
+    SurfacePtr target(cairo_image_surface_create(CAIRO_FORMAT_ARGB32, width, height));
+    cairo_t *cr = cairo_create(target.get());
+    cairo_translate(cr, placement.x, placement.y);
+    cairo_scale(cr, placement.scale, placement.scale);
+    cairo_set_source_surface(cr, image, 0, 0);
+    cairo_pattern_set_filter(cairo_get_source(cr), CAIRO_FILTER_GOOD);
+    cairo_paint(cr);
+    cairo_destroy(cr);
+    return target;
 }
 
 } // namespace astralia

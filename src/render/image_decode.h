@@ -13,6 +13,15 @@ struct DestroySurface {
 
 using SurfacePtr = std::unique_ptr<cairo_surface_t, DestroySurface>;
 
+struct Placement {
+    double scale;
+    double x;
+    double y;
+};
+
+Placement cover(int image_width, int image_height, int area_width, int area_height);
+int jpeg_reduction(double required_scale);
 std::expected<SurfacePtr, std::string> decode_image(const std::string &path, int fit_size = 0);
+std::expected<SurfacePtr, std::string> decode_cover(const std::string &path, int width, int height);
 
 } // namespace astralia

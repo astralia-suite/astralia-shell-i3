@@ -29,10 +29,12 @@ void panel(cairo_t *cr, double x, double y, double w, double h, const Color &bor
 } // namespace
 
 Notifications::Notifications(XConnection &x, EventLoop &loop, Services &services)
-    : x_(x), window_(x, "astralia-notification", XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_BUTTON_PRESS),
+    : services_(services), window_(x, "astralia-notification", XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_BUTTON_PRESS),
       app_(cfg::app_font), summary_(cfg::summary_font), body_(cfg::body_font),
       service_(services.notifications) {
     service_.changed.connect([this] { sync(); });
+    services.outputs.changed.connect([this] { sync(); });
+    services.settings.changed.connect([this] { sync(); });
     app_.wrap(cfg::wrap_width);
     summary_.wrap(cfg::wrap_width);
     body_.wrap(cfg::wrap_width);
@@ -41,7 +43,8 @@ Notifications::Notifications(XConnection &x, EventLoop &loop, Services &services
 
 void Notifications::sync() {
     const std::vector<Notification> &list = service_.list();
-    if (list.empty()) {
+    const Output &target = services_.outputs.at_pointer();
+    if (list.empty() || !services_.settings.enabled(Feature::notifications, target.name)) {
         shown_.clear();
         heights_.clear();
         window_.hide();
@@ -55,7 +58,7 @@ void Notifications::sync() {
     shown_.assign(list.begin() + skip, list.end());
     heights_.erase(heights_.begin(), heights_.begin() + skip);
     double stack_height = notification_stack_height(heights_);
-    StackOrigin origin = notification_stack_origin(x_.pointer_output(), stack_height);
+    StackOrigin origin = notification_stack_origin(target.geometry, stack_height);
     window_.place({static_cast<int16_t>(origin.x), static_cast<int16_t>(origin.y), cfg::card_width,
                    static_cast<uint16_t>(std::ceil(stack_height))});
     paint();

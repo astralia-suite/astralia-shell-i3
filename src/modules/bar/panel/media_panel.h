@@ -32,7 +32,6 @@ class MediaPanel {
     void paint();
     void draw_art(cairo_t *cr, double x, double y);
 
-    XConnection &x_;
     EventLoop &loop_;
     MediaService &media_;
     PanelWindow window_;

@@ -45,3 +45,11 @@ Drop an entry once newer knowledge fully supersedes it.
 - A detached reader thread must own what it touches through a `shared_ptr`. The owner may be destroyed before the child exits.
 - Map a popup beside a panel with `show(false)`, never focus. Taking focus fires the panel's focus-out close; its `owner_events` grab still routes clicks.
 - SNI items signal `NewIcon`/`NewStatus`, rarely `PropertiesChanged`. Refetch `GetAll` on those signals, or icons go stale.
+- Hide bars for unplugged or disabled outputs, never destroy them. `EventLoop` cannot remove windows or timers, so they would dangle.
+- Let one `OutputService` own the RandR notify. `EventLoop::on_event` keeps a single handler per type, so a second owner replaces it.
+- Compare parsed config before emitting changes. A service's own atomic write also trips its `inotify` watch.
+- Decode wallpaper thumbnails off the main thread, through the cover cache. A full `4K` decode takes about half a second.
+- Set `M_ARENA_MAX` to 1 and a fixed `M_MMAP_THRESHOLD`. A decode thread's private arena kept about 50 MB after the tab closed.
+- Wrap decoded `stb_image` pixels in the cairo surface in place. Copying doubled the transient peak of large wallpapers.
+- Decode JPEGs with `libjpeg` scale denominators of 2, 4 or 8. Reduced-size decoding skips most pixels and memory.
+- Touch a cache file's mtime on every hit. Pruning treats mtime as last use, so wallpapers in use survive.

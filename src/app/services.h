@@ -12,8 +12,11 @@
 #include "service/media_service.h"
 #include "service/network_service.h"
 #include "service/notification_service.h"
+#include "service/output_service.h"
 #include "service/polkit_service.h"
+#include "service/settings_service.h"
 #include "service/tray_service.h"
+#include "service/wallpaper_service.h"
 
 namespace astralia {
 
@@ -34,6 +37,9 @@ struct Services {
     AudioService audio;
     MediaService media;
     TrayService tray;
+    OutputService outputs;
+    SettingsService settings;
+    WallpaperService wallpaper;
 };
 
 } // namespace astralia

@@ -7,8 +7,6 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
-#include <sdbus-c++/sdbus-c++.h>
-#include <string>
 #include <xcb/xcb.h>
 
 #include "app/services.h"
@@ -43,10 +41,13 @@ class WidgetCapsule;
 
 class Bar {
   public:
-    Bar(XConnection &x, EventLoop &loop, IpcServer &ipc, Services &services);
+    Bar(XConnection &x, EventLoop &loop, IpcServer &ipc, Services &services, const Output &output);
     ~Bar();
     Bar(const Bar &) = delete;
     Bar &operator=(const Bar &) = delete;
+
+    void place(const Output &output);
+    void hide();
 
   private:
     struct Rect {
@@ -68,6 +69,7 @@ class Bar {
                               clock,
                               item_count };
 
+    void apply_output(const OutputGeometry &output);
     void set_hints(const OutputGeometry &output);
     void paint_background(const Rect &rect);
     void paint_panel();
@@ -75,7 +77,6 @@ class Bar {
     void draw_all();
     void redraw_clock();
     void refresh(Item item);
-    void notify(const std::string &app, const StatusMessage &message);
     void click(const xcb_button_press_event_t &event);
     void hover(std::optional<int> x, bool redraw = false);
     void close_panels_except(const PanelWindow *keep);
@@ -97,7 +98,6 @@ class Bar {
     uint16_t height_;
     Rect panel_{};
     XWindow window_;
-    std::unique_ptr<sdbus::IProxy> notifier_;
     std::unique_ptr<ClockWidget> clock_;
     std::unique_ptr<MediaWidget> media_;
     std::unique_ptr<LogoutWidget> logout_;

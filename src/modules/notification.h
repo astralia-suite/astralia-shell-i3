@@ -26,7 +26,7 @@ class Notifications {
     double measure(const Notification &n);
     void paint();
 
-    XConnection &x_;
+    Services &services_;
     XWindow window_;
     bool fonts_ = register_app_fonts();
     Text app_;

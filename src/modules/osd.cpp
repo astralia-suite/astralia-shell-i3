@@ -48,8 +48,12 @@ void Osd::show(Kind kind, int percent, bool muted) {
     if (now < ready_at_) {
         return;
     }
+    const Output &target = services_.outputs.at_pointer();
+    if (!services_.settings.enabled(Feature::osd, target.name)) {
+        return;
+    }
     hide_at_ = now + cfg::visible_for;
-    OutputGeometry output = x_.pointer_output();
+    const OutputGeometry &output = target.geometry;
     window_.place({static_cast<int16_t>(output.x + (output.width - cfg::width) / 2),
                    static_cast<int16_t>(output.y + output.height - cfg::margin_bottom - cfg::height),
                    cfg::width, cfg::height});

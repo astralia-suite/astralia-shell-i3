@@ -3,13 +3,10 @@
 #include <chrono>
 #include <cmath>
 #include <malloc.h>
-#include <map>
 #include <vector>
 #include <xcb/xcb_ewmh.h>
 
 #include "config/bar_config.h"
-
-#include "core/log.h"
 
 #include "modules/bar.h"
 #include "modules/bar/panel/audio_panel.h"
@@ -36,7 +33,7 @@
 
 namespace astralia {
 
-Bar::Bar(XConnection &x, EventLoop &loop, IpcServer &ipc, Services &services)
+Bar::Bar(XConnection &x, EventLoop &loop, IpcServer &ipc, Services &services, const Output &output)
     : x_(x), loop_(loop), ipc_(ipc), services_(services),
       window_(x, "astralia-shell", XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_POINTER_MOTION | XCB_EVENT_MASK_LEAVE_WINDOW, false) {
     register_app_fonts();
@@ -50,27 +47,15 @@ Bar::Bar(XConnection &x, EventLoop &loop, IpcServer &ipc, Services &services)
     battery_ = std::make_unique<BatteryWidget>();
     tray_ = std::make_unique<TrayWidget>();
     items_ = {tray_.get(), network_.get(), bluetooth_.get(), volume_.get(), brightness_.get(), battery_.get(), media_.get(), clock_.get()};
-    OutputGeometry output = x_.primary_output();
-    width_ = output.width;
     height_ = bar_config::margin_top + bar_config::height;
-    panel_ = {bar_config::margin_x, bar_config::margin_top, width_ - 2 * bar_config::margin_x,
-              bar_config::height};
-
-    window_.place({output.x, output.y, width_, height_});
-    set_hints(output);
-    notifier_ =
-        services_.session.proxy("org.freedesktop.Notifications", "/org/freedesktop/Notifications");
+    apply_output(output.geometry);
     services_.i3.changed.connect([this] { draw_all(); });
     auto update = [this](Item item) {
         refresh(item);
         draw_all();
     };
     services_.bluetooth.changed.connect([update] { update(bluetooth); });
-    services_.bluetooth.messages.connect(
-        [this](const StatusMessage &message) { notify("Bluetooth", message); });
     services_.network.changed.connect([update] { update(network); });
-    services_.network.messages.connect(
-        [this](const StatusMessage &message) { notify("Network", message); });
     services_.audio.changed.connect([update](AudioKind kind) {
         if (kind == AudioKind::sink) {
             update(volume);
@@ -87,7 +72,9 @@ Bar::Bar(XConnection &x, EventLoop &loop, IpcServer &ipc, Services &services)
     clock_panel_ = std::make_unique<ClockPanel>(x_, loop);
     tray_panel_ = std::make_unique<TrayPanel>(x_, loop, services_.tray);
     for (std::size_t i = 0; i < item_count; ++i) {
-        panel_window(static_cast<Item>(i)).changed.connect([this] { sync_panels(); });
+        PanelWindow &panel = panel_window(static_cast<Item>(i));
+        panel.set_output(output.geometry);
+        panel.changed.connect([this] { sync_panels(); });
         refresh(static_cast<Item>(i));
     }
 
@@ -126,6 +113,33 @@ Bar::Bar(XConnection &x, EventLoop &loop, IpcServer &ipc, Services &services)
 }
 
 Bar::~Bar() = default;
+
+void Bar::apply_output(const OutputGeometry &output) {
+    width_ = output.width;
+    panel_ = {bar_config::margin_x, bar_config::margin_top, width_ - 2 * bar_config::margin_x,
+              bar_config::height};
+    window_.place({output.x, output.y, width_, height_});
+    set_hints(output);
+}
+
+void Bar::place(const Output &output) {
+    if (window_.mapped() && window_.geometry() == OutputGeometry{output.geometry.x, output.geometry.y, output.geometry.width, height_}) {
+        return;
+    }
+    close_panels_except(nullptr);
+    apply_output(output.geometry);
+    for (std::size_t i = 0; i < item_count; ++i) {
+        panel_window(static_cast<Item>(i)).set_output(output.geometry);
+    }
+    draw_all();
+    window_.show(false);
+}
+
+void Bar::hide() {
+    close_panels_except(nullptr);
+    hover(std::nullopt);
+    window_.hide();
+}
 
 void Bar::set_hints(const OutputGeometry &output) {
     xcb_ewmh_connection_t *ewmh = x_.ewmh();
@@ -310,22 +324,6 @@ void Bar::toggle_panel(Item item) {
         break;
     case item_count:
         break;
-    }
-}
-
-void Bar::notify(const std::string &app, const StatusMessage &message) {
-    if (!notifier_) {
-        return;
-    }
-    try {
-        notifier_->callMethod("Notify")
-            .onInterface("org.freedesktop.Notifications")
-            .withArguments(app, uint32_t{0}, std::string(), message.summary, message.body,
-                           std::vector<std::string>{}, std::map<std::string, sdbus::Variant>{},
-                           int32_t{-1})
-            .dontExpectReply();
-    } catch (const sdbus::Error &error) {
-        log::error("bar: cannot send notification: {}", error.what());
     }
 }
 

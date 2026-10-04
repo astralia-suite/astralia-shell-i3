@@ -29,7 +29,7 @@ PanelRect draw_button(cairo_t *cr, double x, double y, double size, const char *
 } // namespace
 
 MediaPanel::MediaPanel(XConnection &x, EventLoop &loop, MediaService &media)
-    : x_(x), loop_(loop), media_(media),
+    : loop_(loop), media_(media),
       window_(x, loop, "astralia-media-panel", bar_config::panel_width, bar_config::panel_max_height, [this](const xcb_generic_event_t &event) { handle(event); }, [this] {
           art_.reset();
           art_path_.clear(); }) {
@@ -54,7 +54,7 @@ void MediaPanel::toggle() {
     }
     media_.poll_position();
     paint();
-    window_.open((x_.primary_output().width - window_.width()) / 2, bar_config::panel_top);
+    window_.open((window_.output().width - window_.width()) / 2, bar_config::panel_top);
     loop_.reschedule(poll_timer_);
 }
 

@@ -29,6 +29,8 @@ class PanelWindow {
     int max_height() const { return max_height_; }
     int x() const { return anchor_.x; }
     int y() const { return anchor_.y; }
+    const OutputGeometry &output() const { return output_; }
+    void set_output(const OutputGeometry &output) { output_ = output; }
     cairo_t *cr();
     Keyboard &keyboard() { return keyboard_; }
     void clear();
@@ -50,6 +52,7 @@ class PanelWindow {
     int width_;
     int height_;
     int max_height_;
+    OutputGeometry output_;
     OutputGeometry anchor_{0, 0, 1, 1};
     XWindow window_;
 };

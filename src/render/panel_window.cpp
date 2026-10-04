@@ -7,7 +7,7 @@ namespace astralia {
 
 PanelWindow::PanelWindow(XConnection &x, EventLoop &loop, std::string_view name, int width, int max_height, Handler handler, std::function<void()> closed)
     : x_(x), keyboard_(x.conn()), handler_(std::move(handler)), closed_(std::move(closed)),
-      width_(width), height_(max_height), max_height_(max_height),
+      width_(width), height_(max_height), max_height_(max_height), output_(x.primary_output()),
       window_(x, name,
               XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE |
                   XCB_EVENT_MASK_POINTER_MOTION | XCB_EVENT_MASK_LEAVE_WINDOW | XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_FOCUS_CHANGE) {
@@ -27,9 +27,8 @@ void PanelWindow::place() {
 }
 
 void PanelWindow::open(int right_margin, int top) {
-    OutputGeometry output = x_.primary_output();
-    anchor_.x = static_cast<int16_t>(output.x + output.width - right_margin - width_);
-    anchor_.y = static_cast<int16_t>(output.y + top);
+    anchor_.x = static_cast<int16_t>(output_.x + output_.width - right_margin - width_);
+    anchor_.y = static_cast<int16_t>(output_.y + top);
     place();
     keyboard_.reload();
     open_ = true;

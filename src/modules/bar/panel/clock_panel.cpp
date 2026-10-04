@@ -85,7 +85,7 @@ int clock_panel_iso_week(int year, int month, int day) {
 }
 
 ClockPanel::ClockPanel(XConnection &x, EventLoop &loop)
-    : x_(x), window_(x, loop, "astralia-clock-panel", bar_config::clock_panel_width, panel_height, [this](const xcb_generic_event_t &event) { handle(event); }, [this] { month_offset_ = 0; }) {}
+    : window_(x, loop, "astralia-clock-panel", bar_config::clock_panel_width, panel_height, [this](const xcb_generic_event_t &event) { handle(event); }, [this] { month_offset_ = 0; }) {}
 
 void ClockPanel::toggle() {
     if (window_.is_open()) {
@@ -93,7 +93,7 @@ void ClockPanel::toggle() {
         return;
     }
     paint();
-    window_.open((x_.primary_output().width - window_.width()) / 2, bar_config::panel_top);
+    window_.open((window_.output().width - window_.width()) / 2, bar_config::panel_top);
 }
 
 void ClockPanel::handle(const xcb_generic_event_t &event) {
