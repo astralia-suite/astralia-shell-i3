@@ -132,7 +132,7 @@ void WallpaperTab::paint(cairo_t *cr, const PanelRect &area, std::vector<PanelHi
         const std::string &path = images_[i];
         PanelRect cell = settings_grid_cell(grid_, i, scroll_);
         rounded_rect(cr, cell.x, cell.y, cell.w, cell.h, cfg::thumb_radius);
-        if (cairo_surface_t *thumbnail = thumbnails_.get(path)) {
+        if (cairo_surface_t *thumbnail = thumbnails_.get(path, cairo_get_target(cr))) {
             cairo_save(cr);
             cairo_clip(cr);
             cairo_set_source_surface(cr, thumbnail, cell.x, cell.y);

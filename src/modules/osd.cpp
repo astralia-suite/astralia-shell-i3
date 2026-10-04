@@ -35,6 +35,9 @@ Osd::Osd(XConnection &x, EventLoop &loop, Services &services)
     services_.brightness.changed.connect(
         [this] { show(Kind::brightness, services_.brightness.percent(), false); });
     services_.audio.changed.connect([this](AudioKind kind) {
+        if (kind == AudioKind::nodes) {
+            return;
+        }
         AudioLevel level =
             kind == AudioKind::sink ? services_.audio.sink() : services_.audio.source();
         if (level.present) {

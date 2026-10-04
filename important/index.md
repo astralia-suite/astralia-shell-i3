@@ -12,7 +12,7 @@
 
 - `meson.build`: Builds the core library, shell executable and unit tests; installs fonts and assets.
 - `meson.options`: Optional native CPU tuning for the ThinkPad X201.
-- `build.sh`: Builds, installs dependencies, runs tests, installs or restarts the shell.
+- `build.sh`: Builds with X201 tuning unless `NATIVE_CPU=false`, installs dependencies, runs tests, installs or restarts the shell.
 - `.clang-format`: Project code style.
 
 ## `assets/fonts/`
@@ -137,7 +137,7 @@
 - `widgets.{h,cpp}`: Output chip row and toggle tile drawing.
 - `displays_tab.{h,cpp}`: Per-output bar, OSD and notification toggles with default override.
 - `wallpaper_tab.{h,cpp}`: Folder field, image grid and per-output wallpaper picking.
-- `thumbnail_cache.{h,cpp}`: Loads visible wallpaper thumbnails on a worker thread through the cover cache.
+- `thumbnail_cache.{h,cpp}`: Loads visible wallpaper thumbnails on a low-priority worker thread and keeps them as X-side surfaces.
 
 ## `src/render/`
 
@@ -146,8 +146,8 @@
 - `icons.h`: Icon glyph codepoints and level icon pickers.
 - `app_fonts.{h,cpp}`: Registers the bundled fonts.
 - `app_icon.{h,cpp}`: Finds and loads application icons from the icon theme.
-- `image_decode.{h,cpp}`: Decodes raster and SVG images, JPEGs at reduced size, and crops covers to a box.
-- `cover_cache.{h,cpp}`: Loads images cropped to a box size from an on-disk PNG cache, pruned by age and size.
+- `image_decode.{h,cpp}`: Decodes raster and SVG images, JPEGs at reduced size, crops covers to a box and writes JPEGs.
+- `cover_cache.{h,cpp}`: Loads images cropped to a box size from an on-disk JPEG or PNG cache, pruned by age and size.
 - `widget_capsule.{h,cpp}`: Icon and label widget with hover-revealed label.
 - `draw.{h,cpp}`: Shared cairo drawing helpers.
 - `x_window.{h,cpp}`: Drawable X window.

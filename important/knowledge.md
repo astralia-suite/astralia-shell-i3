@@ -40,6 +40,7 @@ Drop an entry once newer knowledge fully supersedes it.
 - Drive GLib through an `EventLoop` poll source. Polkit and GDBus use changing fds that fixed fd watches miss.
 - Wipe password buffers with `explicit_bzero` after responding or cancelling. `std::string::clear` leaves the bytes in the heap.
 - Hold one sdbus proxy per fixed object, but keep changing NetworkManager paths one-off. Caching per-reconnect paths grows without bound.
+- `AudioService::changed` also fires `AudioKind::nodes` after every volume change. Match each kind explicitly, never with a sink-or-else fallback.
 - Call `EventLoop::reschedule()` when an event moves a timer's deadline earlier. Deadlines are only recomputed after firing.
 - Never destroy an sdbus proxy inside its own async reply callback. Prune per-device proxies from the signal-match handler instead.
 - A detached reader thread must own what it touches through a `shared_ptr`. The owner may be destroyed before the child exits.
@@ -53,3 +54,8 @@ Drop an entry once newer knowledge fully supersedes it.
 - Wrap decoded `stb_image` pixels in the cairo surface in place. Copying doubled the transient peak of large wallpapers.
 - Decode JPEGs with `libjpeg` scale denominators of 2, 4 or 8. Reduced-size decoding skips most pixels and memory.
 - Touch a cache file's mtime on every hit. Pruning treats mtime as last use, so wallpapers in use survive.
+- Cache opaque covers as JPEG and transparent ones as PNG. JPEG writes faster and is far smaller on the X201's slow disk.
+- Keep thumbnails as X-side surfaces made with `cairo_surface_create_similar` on first paint. Image surfaces upload to the X server on every paint.
+- Batch repaints from worker results through a timer, and reschedule only when no repaint is pending. Rescheduling on each arrival delays the paint while results keep coming.
+- Run the thumbnail worker at nice `10`. On the X201's two cores, decoding otherwise competes with the UI thread.
+- A nested `Xephyr` shows no cursor and ignores XTest clicks for the shell. Click inside its window by hand.

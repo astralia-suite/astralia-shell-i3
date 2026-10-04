@@ -1,6 +1,6 @@
 # Handoff: X201 optimization
 
-Status: proposed, awaiting user approval. No code for this work exists yet.
+Status: planned work done in `local/plan/x201-optimization.md`, with first X201 numbers there. Conditional work waits for numbers from the real `133`-image folder.
 
 ## Context
 
@@ -40,6 +40,15 @@ Status: proposed, awaiting user approval. No code for this work exists yet.
 5. Timing logs.
    - Log, with `log::info`, how long each wallpaper apply, thumbnail load and settings paint takes.
    - The user will run the build on the X201 and send the log, so further decisions use real numbers.
+
+## X201 numbers for the 133-image folder
+
+- Folder: `~/Nibba/Keqing/wallpapers/images`. Measured with `load_cover` at thumbnail size, outside the shell, on the X201 build.
+- Cold, all `130` decodable images: `13.6` s in total, median `38` ms, slowest `931` ms (`7941x3323` PNG). The first `15` images take `2.5` s.
+- From cache: `58` ms in total, `7` MB peak. The cache holds `113` `.jpg` and `17` `.png` files, `1.5` MB.
+- Peak memory: `323` MB, from the two progressive `10240x4320` JPEGs. A progressive JPEG keeps a full-size coefficient buffer in `libjpeg` even at a reduced scale. PNGs peaked lower, at about `263` MB or less.
+- PNG stream-decoding would not lower that peak, because the peak comes from the JPEGs. The peak happens only on a cache miss, and the X201 has `7.7` GB of RAM.
+- The `3` `.webp` files fail with `unknown image type`, as expected.
 
 ## Conditional work
 

@@ -43,13 +43,18 @@ void prune(const std::filesystem::path &directory) {
     }
 }
 
-void store(cairo_surface_t *surface, const std::filesystem::path &target) {
+void store(cairo_surface_t *surface, const std::filesystem::path &stem) {
+    bool opaque = surface_opaque(surface);
+    std::filesystem::path target = stem;
+    target += opaque ? ".jpg" : ".png";
     static std::atomic<uintmax_t> pending{cover_cache_config::prune_after_bytes};
     std::error_code error;
     std::filesystem::create_directories(target.parent_path(), error);
     std::filesystem::path temporary = target;
     temporary += std::format(".{:x}.tmp", std::hash<std::thread::id>{}(std::this_thread::get_id()));
-    if (cairo_surface_write_to_png(surface, temporary.c_str()) == CAIRO_STATUS_SUCCESS) {
+    bool encoded = opaque ? write_jpeg(surface, temporary.c_str(), cover_cache_config::jpeg_quality)
+                          : cairo_surface_write_to_png(surface, temporary.c_str()) == CAIRO_STATUS_SUCCESS;
+    if (encoded) {
         std::filesystem::rename(temporary, target, error);
     }
     if (error) {
@@ -93,7 +98,7 @@ std::vector<std::string> cover_cache_expired(std::vector<CoverCacheEntry> entrie
 
 std::string cover_cache_name(std::string_view path, uintmax_t size, int64_t modified, int width, int height) {
     std::size_t key = std::hash<std::string>{}(std::format("{}|{}|{}|{}x{}", path, size, modified, width, height));
-    return std::format("{:016x}.png", key);
+    return std::format("{:016x}", key);
 }
 
 std::expected<SurfacePtr, std::string> load_cover(const std::string &path, int width, int height) {
@@ -103,17 +108,24 @@ std::expected<SurfacePtr, std::string> load_cover(const std::string &path, int w
         return std::unexpected(error.message());
     }
     int64_t modified = std::filesystem::last_write_time(path, error).time_since_epoch().count();
-    std::filesystem::path cached = std::filesystem::path(cache_directory()) / cover_cache_name(path, size, modified, width, height);
-    if (auto stored = decode_image(cached.string())) {
-        cairo_surface_t *surface = stored->get();
-        if (cairo_image_surface_get_width(surface) == width && cairo_image_surface_get_height(surface) == height) {
-            std::filesystem::last_write_time(cached, std::filesystem::file_time_type::clock::now(), error);
-            return stored;
+    std::filesystem::path stem = std::filesystem::path(cache_directory()) / cover_cache_name(path, size, modified, width, height);
+    for (const char *extension : {".jpg", ".png"}) {
+        std::filesystem::path cached = stem;
+        cached += extension;
+        if (!std::filesystem::exists(cached, error)) {
+            continue;
+        }
+        if (auto stored = decode_image(cached.string())) {
+            cairo_surface_t *surface = stored->get();
+            if (cairo_image_surface_get_width(surface) == width && cairo_image_surface_get_height(surface) == height) {
+                std::filesystem::last_write_time(cached, std::filesystem::file_time_type::clock::now(), error);
+                return stored;
+            }
         }
     }
     auto image = decode_cover(path, width, height);
     if (image) {
-        store(image->get(), cached);
+        store(image->get(), stem);
     }
     return image;
 }

@@ -23,5 +23,7 @@ Placement cover(int image_width, int image_height, int area_width, int area_heig
 int jpeg_reduction(double required_scale);
 std::expected<SurfacePtr, std::string> decode_image(const std::string &path, int fit_size = 0);
 std::expected<SurfacePtr, std::string> decode_cover(const std::string &path, int width, int height);
+bool surface_opaque(cairo_surface_t *surface);
+bool write_jpeg(cairo_surface_t *surface, const char *path, int quality);
 
 } // namespace astralia

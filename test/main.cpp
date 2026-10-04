@@ -1,8 +1,11 @@
 #include <array>
+#include <cairo.h>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
+#include <format>
 #include <map>
 #include <print>
 #include <set>
@@ -10,6 +13,7 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <unistd.h>
 #include <vector>
 
 #include "core/cli.h"
@@ -265,12 +269,26 @@ void check_cover_cache() {
     check(astralia::cover_cache_expired(Entries{{"x.1.tmp", mib, 1000 * day - 7200}, {"y.2.tmp", mib, 1000 * day - 60}}, 1000 * day) == std::vector<std::string>{"x.1.tmp"}, "only stale temporary files expire");
 
     std::string name = cover_cache_name("/w/a.jpg", 100, 5, 1920, 1200);
-    check(name.size() == 20 && name.ends_with(".png"), "cache names are a hash and .png");
+    check(name.size() == 16 && !name.contains('.'), "cache names are a bare hash");
     check(name == cover_cache_name("/w/a.jpg", 100, 5, 1920, 1200), "the same input gives the same name");
     check(name != cover_cache_name("/w/b.jpg", 100, 5, 1920, 1200), "a different path changes the name");
     check(name != cover_cache_name("/w/a.jpg", 101, 5, 1920, 1200), "a different size changes the name");
     check(name != cover_cache_name("/w/a.jpg", 100, 6, 1920, 1200), "a new mtime changes the name");
     check(name != cover_cache_name("/w/a.jpg", 100, 5, 1920, 1080), "a different target changes the name");
+
+    astralia::SurfacePtr opaque(cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 4, 4));
+    astralia::SurfacePtr clear(cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 4, 4));
+    cairo_t *cr = cairo_create(opaque.get());
+    cairo_set_source_rgb(cr, 0.2, 0.4, 0.6);
+    cairo_paint(cr);
+    cairo_destroy(cr);
+    check(astralia::surface_opaque(opaque.get()), "a painted surface is opaque");
+    check(!astralia::surface_opaque(clear.get()), "a transparent surface is not opaque");
+    std::string jpeg = (std::filesystem::temp_directory_path() / std::format("astralia-test-{}.jpg", getpid())).string();
+    check(astralia::write_jpeg(opaque.get(), jpeg.c_str(), 90), "an opaque surface writes as jpeg");
+    auto decoded = astralia::decode_image(jpeg);
+    check(decoded && cairo_image_surface_get_width(decoded->get()) == 4 && cairo_image_surface_get_height(decoded->get()) == 4 && astralia::surface_opaque(decoded->get()), "a written jpeg decodes back opaque at the same size");
+    std::filesystem::remove(jpeg);
 }
 
 void check_config_file() {

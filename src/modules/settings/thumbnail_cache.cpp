@@ -1,3 +1,4 @@
+#include <chrono>
 #include <condition_variable>
 #include <cstdint>
 #include <deque>
@@ -5,6 +6,7 @@
 #include <malloc.h>
 #include <mutex>
 #include <sys/eventfd.h>
+#include <sys/resource.h>
 #include <thread>
 #include <unistd.h>
 #include <utility>
@@ -27,11 +29,14 @@ namespace cfg = settings_config;
 constexpr int side = static_cast<int>(cfg::thumb_size);
 
 SurfacePtr render_thumbnail(const std::string &path) {
+    auto start = std::chrono::steady_clock::now();
     auto image = load_cover(path, side, side);
     if (!image) {
         log::error("settings: thumbnail {}: {}", path, image.error());
         return nullptr;
     }
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start);
+    log::info("settings: thumbnail {} in {} ms", path, elapsed.count());
     return std::move(*image);
 }
 
@@ -92,9 +97,20 @@ void ThumbnailCache::clear() {
     malloc_trim(0);
 }
 
-cairo_surface_t *ThumbnailCache::get(const std::string &path) const {
+cairo_surface_t *ThumbnailCache::get(const std::string &path, cairo_surface_t *target) {
     auto it = thumbnails_.find(path);
-    return it != thumbnails_.end() ? it->second.get() : nullptr;
+    if (it == thumbnails_.end() || !it->second) {
+        return nullptr;
+    }
+    if (cairo_surface_get_type(it->second.get()) == CAIRO_SURFACE_TYPE_IMAGE) {
+        SurfacePtr remote(cairo_surface_create_similar(target, CAIRO_CONTENT_COLOR_ALPHA, side, side));
+        cairo_t *cr = cairo_create(remote.get());
+        cairo_set_source_surface(cr, it->second.get(), 0, 0);
+        cairo_paint(cr);
+        cairo_destroy(cr);
+        it->second = std::move(remote);
+    }
+    return it->second.get();
 }
 
 void ThumbnailCache::request(const std::vector<std::string> &paths) {
@@ -140,6 +156,7 @@ void ThumbnailCache::collect() {
 namespace {
 
 void work(const std::shared_ptr<ThumbnailCache::Shared> &shared) {
+    setpriority(PRIO_PROCESS, static_cast<id_t>(gettid()), 10);
     for (;;) {
         std::string path;
         {

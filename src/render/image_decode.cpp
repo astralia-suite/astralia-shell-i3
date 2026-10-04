@@ -241,4 +241,56 @@ std::expected<SurfacePtr, std::string> decode_cover(const std::string &path, int
     return target;
 }
 
+bool surface_opaque(cairo_surface_t *surface) {
+    cairo_surface_flush(surface);
+    int width = cairo_image_surface_get_width(surface);
+    int height = cairo_image_surface_get_height(surface);
+    int stride = cairo_image_surface_get_stride(surface);
+    const uint8_t *pixels = cairo_image_surface_get_data(surface);
+    for (int y = 0; y < height; ++y) {
+        const auto *row = reinterpret_cast<const uint32_t *>(pixels + static_cast<std::size_t>(y) * stride);
+        for (int x = 0; x < width; ++x) {
+            if (row[x] >> 24 != 0xff) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+bool write_jpeg(cairo_surface_t *surface, const char *path, int quality) {
+    std::unique_ptr<std::FILE, CloseFile> file(std::fopen(path, "wb"));
+    if (!file) {
+        return false;
+    }
+    cairo_surface_flush(surface);
+    jpeg_compress_struct encoder;
+    JpegError error;
+    encoder.err = jpeg_std_error(&error.manager);
+    error.manager.error_exit = [](j_common_ptr info) { std::longjmp(reinterpret_cast<JpegError *>(info->err)->jump, 1); };
+    error.manager.output_message = [](j_common_ptr) {};
+    if (setjmp(error.jump) != 0) {
+        jpeg_destroy_compress(&encoder);
+        return false;
+    }
+    jpeg_create_compress(&encoder);
+    jpeg_stdio_dest(&encoder, file.get());
+    encoder.image_width = static_cast<JDIMENSION>(cairo_image_surface_get_width(surface));
+    encoder.image_height = static_cast<JDIMENSION>(cairo_image_surface_get_height(surface));
+    encoder.input_components = 4;
+    encoder.in_color_space = JCS_EXT_BGRX;
+    jpeg_set_defaults(&encoder);
+    jpeg_set_quality(&encoder, quality, TRUE);
+    jpeg_start_compress(&encoder, TRUE);
+    uint8_t *pixels = cairo_image_surface_get_data(surface);
+    int stride = cairo_image_surface_get_stride(surface);
+    while (encoder.next_scanline < encoder.image_height) {
+        JSAMPROW row = pixels + static_cast<std::size_t>(encoder.next_scanline) * stride;
+        jpeg_write_scanlines(&encoder, &row, 1);
+    }
+    jpeg_finish_compress(&encoder);
+    jpeg_destroy_compress(&encoder);
+    return std::fflush(file.get()) == 0;
+}
+
 } // namespace astralia

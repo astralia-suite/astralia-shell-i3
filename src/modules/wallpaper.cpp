@@ -1,4 +1,5 @@
 #include <cairo-xcb.h>
+#include <chrono>
 #include <cstdlib>
 #include <malloc.h>
 #include <optional>
@@ -39,13 +40,19 @@ void paint_output(cairo_t *cr, const Output &output, const WallpaperService &wal
         return;
     }
     const OutputGeometry &area = output.geometry;
+    auto start = std::chrono::steady_clock::now();
     auto image = load_cover(*path, area.width, area.height);
     if (!image) {
         log::error("wallpaper {} for {}: {}", *path, output.name, image.error());
         return;
     }
+    auto loaded = std::chrono::steady_clock::now();
     cairo_set_source_surface(cr, image->get(), area.x, area.y);
     cairo_paint(cr);
+    auto painted = std::chrono::steady_clock::now();
+    log::info("wallpaper {} for {}: load {} ms, paint {} ms", *path, output.name,
+              std::chrono::duration_cast<std::chrono::milliseconds>(loaded - start).count(),
+              std::chrono::duration_cast<std::chrono::milliseconds>(painted - loaded).count());
 }
 
 void draw(XConnection &x, xcb_pixmap_t pixmap, const std::vector<Output> &outputs,

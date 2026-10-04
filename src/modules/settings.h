@@ -43,6 +43,7 @@ class Settings {
     void release_grab();
 
     XConnection &x_;
+    EventLoop &loop_;
     Services &services_;
     XWindow window_;
     Keyboard keyboard_;
@@ -54,6 +55,8 @@ class Settings {
     std::vector<PanelHit> hits_;
     bool open_ = false;
     bool grabbed_ = false;
+    bool repaint_pending_ = false;
+    int repaint_timer_ = 0;
 };
 
 } // namespace astralia

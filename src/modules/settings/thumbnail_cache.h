@@ -25,7 +25,7 @@ class ThumbnailCache {
     void start();
     void stop();
     void clear();
-    cairo_surface_t *get(const std::string &path) const;
+    cairo_surface_t *get(const std::string &path, cairo_surface_t *target);
     bool contains(const std::string &path) const { return thumbnails_.contains(path); }
     void request(const std::vector<std::string> &paths);
 

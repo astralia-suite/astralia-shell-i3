@@ -7,16 +7,22 @@
 # test: build and run the unit tests
 # install: build and deploy into /usr/bin/
 # run: kill the running shell, install and start it
+# NATIVE_CPU=false: build without the X201 tuning (-march=westmere)
 
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
 
 cmd_setup() {
-    sudo pacman -S --needed meson ninja gcc clang pkgconf libxcb xcb-util-wm xcb-util-keysyms cairo pango fontconfig resvg libjpeg-turbo stb sdbus-cpp libxkbcommon libxkbcommon-x11 polkit libpipewire pipewire wireplumber bluez networkmanager upower fd brightnessctl
+    sudo pacman -S --needed meson ninja gcc clang pkgconf libxcb xcb-util-wm xcb-util-keysyms cairo pango fontconfig resvg libjpeg-turbo stb sdbus-cpp libxkbcommon libxkbcommon-x11 polkit libpipewire pipewire wireplumber bluez networkmanager upower fd brightnessctl xorg-server-xephyr
 }
 
 cmd_build() {
-    [[ -f build/build.ninja ]] || meson setup build --prefix=/usr
+    local native="-Dnative_cpu=${NATIVE_CPU:-true}"
+    if [[ -f build/build.ninja ]]; then
+        meson configure build "$native"
+    else
+        meson setup build --prefix=/usr "$native"
+    fi
     meson compile -C build
 }
 

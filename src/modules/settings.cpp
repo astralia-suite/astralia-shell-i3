@@ -1,3 +1,4 @@
+#include <chrono>
 #include <cstdlib>
 #include <malloc.h>
 #include <string>
@@ -19,14 +20,25 @@ namespace cfg = settings_config;
 } // namespace
 
 Settings::Settings(XConnection &x, EventLoop &loop, IpcServer &ipc, Services &services)
-    : x_(x), services_(services),
+    : x_(x), loop_(loop), services_(services),
       window_(x, "astralia-settings", XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_FOCUS_CHANGE),
       keyboard_(x.conn()), displays_(services),
       wallpaper_(services, loop, [this] {
-          if (open_ && tab_ == wallpaper) {
-              paint();
+          if (!repaint_pending_) {
+              repaint_pending_ = true;
+              loop_.reschedule(repaint_timer_);
           }
       }) {
+    repaint_timer_ = loop.add_timer([this] { return repaint_pending_ ? cfg::repaint_batch : cfg::repaint_idle; },
+                                    [this] {
+                                        if (!repaint_pending_) {
+                                            return;
+                                        }
+                                        repaint_pending_ = false;
+                                        if (open_ && tab_ == wallpaper) {
+                                            paint();
+                                        }
+                                    });
     loop.on_window(window_.id(), [this](const xcb_generic_event_t &event) { handle(event); });
     ipc.add({"settings",
              [this] {
@@ -197,6 +209,7 @@ void Settings::sync() {
 }
 
 void Settings::paint() {
+    auto start = std::chrono::steady_clock::now();
     cairo_t *cr = window_.cr();
     window_.clear();
     panel_draw_card(cr, geometry_.card.x, geometry_.card.y, geometry_.card.w, geometry_.card.h);
@@ -222,6 +235,10 @@ void Settings::paint() {
         wallpaper_.paint(cr, geometry_.content, hits_);
     }
     window_.present();
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start);
+    if (elapsed >= cfg::slow_paint) {
+        log::info("settings: paint in {} ms", elapsed.count());
+    }
 }
 
 } // namespace astralia

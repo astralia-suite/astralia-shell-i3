@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <chrono>
 #include <cstddef>
 #include <string_view>
 
@@ -69,5 +70,10 @@ inline constexpr double scroll_step = 60.0;
 inline constexpr std::size_t max_images = 400;
 inline constexpr std::size_t thumb_cache_limit = 80;
 inline constexpr std::array<std::string_view, 6> image_extensions{".png", ".jpg", ".jpeg", ".jfif", ".bmp", ".svg"};
+
+// Repaint
+inline constexpr std::chrono::milliseconds repaint_batch{50};
+inline constexpr std::chrono::milliseconds repaint_idle = std::chrono::hours(1);
+inline constexpr std::chrono::milliseconds slow_paint{16};
 
 } // namespace astralia::settings_config

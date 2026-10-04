@@ -19,6 +19,9 @@ inline constexpr int64_t max_age_seconds = 90ll * 24 * 3600;
 inline constexpr uintmax_t prune_after_bytes = 32ull * 1024 * 1024;
 inline constexpr int64_t stale_temporary_seconds = 3600;
 
+// Encoding
+inline constexpr int jpeg_quality = 90;
+
 } // namespace astralia::cover_cache_config
 
 namespace astralia {
