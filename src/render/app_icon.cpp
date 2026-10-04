@@ -5,7 +5,7 @@
 #include <string_view>
 #include <unordered_map>
 
-#include "modules/launcher/app_icon.h"
+#include "render/app_icon.h"
 
 namespace astralia {
 

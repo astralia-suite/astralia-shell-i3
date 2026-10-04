@@ -13,6 +13,7 @@
 #include "service/network_service.h"
 #include "service/notification_service.h"
 #include "service/polkit_service.h"
+#include "service/tray_service.h"
 
 namespace astralia {
 
@@ -32,6 +33,7 @@ struct Services {
     PolkitService polkit;
     AudioService audio;
     MediaService media;
+    TrayService tray;
 };
 
 } // namespace astralia

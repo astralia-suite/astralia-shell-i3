@@ -43,3 +43,5 @@ Drop an entry once newer knowledge fully supersedes it.
 - Call `EventLoop::reschedule()` when an event moves a timer's deadline earlier. Deadlines are only recomputed after firing.
 - Never destroy an sdbus proxy inside its own async reply callback. Prune per-device proxies from the signal-match handler instead.
 - A detached reader thread must own what it touches through a `shared_ptr`. The owner may be destroyed before the child exits.
+- Map a popup beside a panel with `show(false)`, never focus. Taking focus fires the panel's focus-out close; its `owner_events` grab still routes clicks.
+- SNI items signal `NewIcon`/`NewStatus`, rarely `PropertiesChanged`. Refetch `GetAll` on those signals, or icons go stale.

@@ -19,6 +19,7 @@
 #include "modules/bar/panel/clock_panel.h"
 #include "modules/bar/panel/media_panel.h"
 #include "modules/bar/panel/network_panel.h"
+#include "modules/bar/panel/tray_panel.h"
 #include "modules/bar/widget/battery_widget.h"
 #include "modules/bar/widget/bluetooth_widget.h"
 #include "modules/bar/widget/brightness_widget.h"
@@ -26,6 +27,7 @@
 #include "modules/bar/widget/logout_widget.h"
 #include "modules/bar/widget/media_widget.h"
 #include "modules/bar/widget/network_widget.h"
+#include "modules/bar/widget/tray_widget.h"
 #include "modules/bar/widget/volume_widget.h"
 #include "modules/bar/widget/workspace_widget.h"
 
@@ -46,7 +48,8 @@ Bar::Bar(XConnection &x, EventLoop &loop, IpcServer &ipc, Services &services)
     brightness_ = std::make_unique<BrightnessWidget>();
     volume_ = std::make_unique<VolumeWidget>();
     battery_ = std::make_unique<BatteryWidget>();
-    items_ = {network_.get(), bluetooth_.get(), volume_.get(), brightness_.get(), battery_.get(), media_.get(), clock_.get()};
+    tray_ = std::make_unique<TrayWidget>();
+    items_ = {tray_.get(), network_.get(), bluetooth_.get(), volume_.get(), brightness_.get(), battery_.get(), media_.get(), clock_.get()};
     OutputGeometry output = x_.primary_output();
     width_ = output.width;
     height_ = bar_config::margin_top + bar_config::height;
@@ -82,6 +85,7 @@ Bar::Bar(XConnection &x, EventLoop &loop, IpcServer &ipc, Services &services)
     network_panel_ = std::make_unique<NetworkPanel>(x_, loop, services_.network);
     media_panel_ = std::make_unique<MediaPanel>(x_, loop, services_.media);
     clock_panel_ = std::make_unique<ClockPanel>(x_, loop);
+    tray_panel_ = std::make_unique<TrayPanel>(x_, loop, services_.tray);
     for (std::size_t i = 0; i < item_count; ++i) {
         panel_window(static_cast<Item>(i)).changed.connect([this] { sync_panels(); });
         refresh(static_cast<Item>(i));
@@ -246,6 +250,7 @@ void Bar::refresh(Item item) {
     case battery:
         battery_->update(services_.battery.status());
         break;
+    case tray:
     case media:
     case clock:
     case item_count:
@@ -255,6 +260,8 @@ void Bar::refresh(Item item) {
 
 PanelWindow &Bar::panel_window(Item item) {
     switch (item) {
+    case tray:
+        return tray_panel_->window();
     case bluetooth:
         return bluetooth_panel_->window();
     case network:
@@ -277,6 +284,9 @@ PanelWindow &Bar::panel_window(Item item) {
 void Bar::toggle_panel(Item item) {
     close_panels_except(&panel_window(item));
     switch (item) {
+    case tray:
+        tray_panel_->toggle();
+        break;
     case bluetooth:
         bluetooth_panel_->toggle();
         break;

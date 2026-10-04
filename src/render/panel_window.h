@@ -27,6 +27,8 @@ class PanelWindow {
     int width() const { return width_; }
     int height() const { return height_; }
     int max_height() const { return max_height_; }
+    int x() const { return anchor_.x; }
+    int y() const { return anchor_.y; }
     cairo_t *cr();
     Keyboard &keyboard() { return keyboard_; }
     void clear();

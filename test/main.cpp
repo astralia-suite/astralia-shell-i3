@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <map>
 #include <print>
 #include <set>
 #include <source_location>
@@ -18,12 +19,12 @@
 #include "modules/bar/panel/battery_panel.h"
 #include "modules/bar/panel/clock_panel.h"
 #include "modules/bar/panel/network_panel.h"
+#include "modules/bar/panel/tray_panel.h"
 #include "modules/bar/widget/battery_widget.h"
 #include "modules/bar/widget/bluetooth_widget.h"
 #include "modules/bar/widget/clock_widget.h"
 #include "modules/bar/widget/network_widget.h"
 #include "modules/bar/widget/workspace_widget.h"
-#include "modules/launcher/app_icon.h"
 #include "modules/launcher/apps_provider.h"
 #include "modules/launcher/desktop_entry.h"
 #include "modules/launcher/files_provider.h"
@@ -37,6 +38,7 @@
 #include "modules/wallpaper/config_file.h"
 #include "modules/wallpaper/image.h"
 
+#include "render/app_icon.h"
 #include "render/icons.h"
 #include "render/palette.h"
 #include "render/panel_chrome.h"
@@ -46,6 +48,7 @@
 #include "service/bluetooth_service.h"
 #include "service/media_service.h"
 #include "service/network_service.h"
+#include "service/tray_service.h"
 
 namespace {
 
@@ -497,6 +500,23 @@ void check_media() {
     check(astralia::media_select_player({{"a", MediaPlayback::paused}, {"b", MediaPlayback::stopped}}) == 0, "else the first");
 }
 
+void check_tray() {
+    using astralia::TrayMenuLayout;
+    using Props = std::map<std::string, sdbus::Variant>;
+    check(astralia::tray_strip_mnemonic("_Open __file") == "Open _file", "mnemonics stripped, doubled kept");
+    TrayMenuLayout leaf{int32_t{3}, Props{{"label", sdbus::Variant(std::string("_Quit"))}, {"enabled", sdbus::Variant(false)}}, std::vector<sdbus::Variant>{}};
+    TrayMenuLayout separator{int32_t{2}, Props{{"type", sdbus::Variant(std::string("separator"))}}, std::vector<sdbus::Variant>{}};
+    TrayMenuLayout toggle{int32_t{4}, Props{{"label", sdbus::Variant(std::string("Mute"))}, {"toggle-type", sdbus::Variant(std::string("checkmark"))}, {"toggle-state", sdbus::Variant(int32_t{1})}}, std::vector<sdbus::Variant>{}};
+    TrayMenuLayout sub{int32_t{1}, Props{{"label", sdbus::Variant(std::string("More"))}, {"children-display", sdbus::Variant(std::string("submenu"))}}, std::vector<sdbus::Variant>{sdbus::Variant(toggle)}};
+    TrayMenuLayout root{int32_t{0}, Props{}, std::vector<sdbus::Variant>{sdbus::Variant(sub), sdbus::Variant(separator), sdbus::Variant(leaf)}};
+    astralia::TrayMenuEntry menu = astralia::tray_parse_menu(root);
+    check(menu.children.size() == 3, "three top-level entries");
+    check(menu.children[0].children.size() == 1 && menu.children[0].children[0].checkbox && menu.children[0].children[0].checked, "nested checked toggle");
+    check(menu.children[1].separator, "separator parsed");
+    check(menu.children[2].label == "Quit" && !menu.children[2].enabled, "disabled leaf label");
+    check(astralia::tray_menu_height(&menu.children, false) == 2 * 6 + 2 * 32 + 9, "menu height counts rows and separator");
+}
+
 int main() {
     check_ms_until_next_second();
     check_parse_invocation();
@@ -523,6 +543,7 @@ int main() {
     check_status_panels();
     check_calendar();
     check_media();
+    check_tray();
     if (failures > 0) {
         std::println(stderr, "{} check(s) failed", failures);
         return EXIT_FAILURE;

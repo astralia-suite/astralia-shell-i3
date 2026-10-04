@@ -87,6 +87,17 @@ inline constexpr int clock_nav_gap = 6;
 inline constexpr int clock_today_dot = 6;
 inline constexpr const char *clock_big_day_font = "Comic Shanns Mono 48";
 
+// Tray panel and menu
+inline constexpr int tray_cell_size = 48;
+inline constexpr int tray_icon_size = 24;
+inline constexpr int tray_grid_gap = 8;
+inline constexpr int tray_menu_width = 240;
+inline constexpr int tray_menu_padding = 6;
+inline constexpr int tray_menu_row_height = 32;
+inline constexpr int tray_menu_separator_height = 9;
+inline constexpr int tray_menu_row_padding = 10;
+inline constexpr int tray_menu_offset = 4;
+
 // Typography
 inline constexpr const char *font = "Comic Shanns Mono 15";
 inline constexpr const char *icon_font = "tabler-icons 17";
@@ -95,6 +106,7 @@ inline constexpr const char *icon_font = "tabler-icons 17";
 inline constexpr const char *clock_format = "%a %Y-%m-%d %H:%M:%S";
 inline constexpr const char *logout_label = "Logout";
 inline constexpr const char *media_label = "Media";
+inline constexpr const char *tray_label = "Tray";
 inline constexpr const char *bluetooth_idle_label = "Idle";
 inline constexpr const char *bluetooth_disabled_label = "Disabled";
 

@@ -16,10 +16,10 @@
 #include "core/unique_fd.h"
 #include "core/x_connection.h"
 
-#include "modules/launcher/app_icon.h"
 #include "modules/launcher/search_process.h"
 
 #include "render/app_fonts.h"
+#include "render/app_icon.h"
 #include "render/text.h"
 #include "render/x_window.h"
 

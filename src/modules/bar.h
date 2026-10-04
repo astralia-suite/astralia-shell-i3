@@ -36,6 +36,8 @@ class MediaWidget;
 class NetworkPanel;
 class NetworkWidget;
 class PanelWindow;
+class TrayPanel;
+class TrayWidget;
 class VolumeWidget;
 class WidgetCapsule;
 
@@ -56,7 +58,8 @@ class Bar {
         bool contains(int px) const { return px >= x && px < x + width; }
     };
 
-    enum Item : std::size_t { network,
+    enum Item : std::size_t { tray,
+                              network,
                               bluetooth,
                               volume,
                               brightness,
@@ -103,6 +106,7 @@ class Bar {
     std::unique_ptr<BrightnessWidget> brightness_;
     std::unique_ptr<VolumeWidget> volume_;
     std::unique_ptr<BatteryWidget> battery_;
+    std::unique_ptr<TrayWidget> tray_;
     std::array<WidgetCapsule *, item_count> items_{};
     std::array<Rect, item_count> item_rects_{};
     std::unique_ptr<AudioPanel> audio_panel_;
@@ -112,6 +116,7 @@ class Bar {
     std::unique_ptr<NetworkPanel> network_panel_;
     std::unique_ptr<MediaPanel> media_panel_;
     std::unique_ptr<ClockPanel> clock_panel_;
+    std::unique_ptr<TrayPanel> tray_panel_;
     Rect logout_rect_{};
     Rect workspace_rect_{};
     std::chrono::steady_clock::time_point linger_until_{};

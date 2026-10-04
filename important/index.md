@@ -70,7 +70,7 @@
 
 ## `src/modules/`
 
-- `bar.{h,cpp}`: Top bar with logout, workspaces, media, clock and status widgets; opens their panels.
+- `bar.{h,cpp}`: Top bar with logout, workspaces, media, clock, tray and status widgets; opens their panels.
 - `launcher.{h,cpp}`: App, file and command launcher overlay.
 - `logout.{h,cpp}`: Logout overlay with power action buttons.
 - `notification.{h,cpp}`: Desktop notification cards.
@@ -90,6 +90,7 @@
 - `brightness_widget.{h,cpp}`: Brightness icon with percent label.
 - `volume_widget.{h,cpp}`: Volume icon with percent or muted label.
 - `battery_widget.{h,cpp}`: Battery icon with percent or plugged-in label.
+- `tray_widget.{h,cpp}`: Tray icon with label.
 
 ## `src/modules/bar/panel/`
 
@@ -100,10 +101,10 @@
 - `media_panel.{h,cpp}`: Now-playing panel with art, track info, position and playback controls.
 - `clock_panel.{h,cpp}`: Calendar panel with today's date and month navigation.
 - `network_panel.{h,cpp}`: Wi-Fi toggle and network connect, disconnect and forget panel.
+- `tray_panel.{h,cpp}`: Tray icon grid panel and its separate popup menu window with submenus.
 
 ## `src/modules/launcher/`
 
-- `app_icon.{h,cpp}`: Finds and loads application icons.
 - `apps_provider.{h,cpp}`: Searches desktop applications.
 - `desktop_entry.{h,cpp}`: Reads `.desktop` files.
 - `files_provider.{h,cpp}`: Searches and lists files and directories.
@@ -136,6 +137,7 @@
 - `palette.h`: Shared colors, radii and borders.
 - `icons.h`: Icon glyph codepoints and level icon pickers.
 - `app_fonts.{h,cpp}`: Registers the bundled fonts.
+- `app_icon.{h,cpp}`: Finds and loads application icons from the icon theme.
 - `image_decode.{h,cpp}`: Decodes raster and SVG images.
 - `widget_capsule.{h,cpp}`: Icon and label widget with hover-revealed label.
 - `draw.{h,cpp}`: Shared cairo drawing helpers.
@@ -155,6 +157,7 @@
 - `audio_service.{h,cpp}`: Audio devices, streams, volume and mute.
 - `media_service.{h,cpp}`: Media player state and playback control.
 - `battery_service.{h,cpp}`: Battery state.
+- `tray_service.{h,cpp}`: StatusNotifierWatcher host, tray items, activation and `dbusmenu` menus.
 
 ## `test/`
 
