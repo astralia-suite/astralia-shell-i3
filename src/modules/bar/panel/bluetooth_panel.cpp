@@ -81,7 +81,7 @@ void BluetoothPanel::toggle() {
     }
     bluetooth_.start_discovery();
     paint();
-    window_.open(bar_config::margin_x, bar_config::panel_top);
+    window_.open(bar_config::margin_x);
 }
 
 void BluetoothPanel::handle(const xcb_generic_event_t &event) {

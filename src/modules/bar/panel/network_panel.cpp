@@ -171,7 +171,7 @@ void NetworkPanel::toggle() {
     }
     network_.start_watch();
     paint();
-    window_.open(bar_config::margin_x, bar_config::panel_top);
+    window_.open(bar_config::margin_x);
 }
 
 void NetworkPanel::handle(const xcb_generic_event_t &event) {

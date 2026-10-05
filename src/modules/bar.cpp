@@ -9,7 +9,6 @@
 #include "config/bar_config.h"
 
 #include "modules/bar.h"
-#include "modules/bar/panel/audio_panel.h"
 #include "modules/bar/panel/battery_panel.h"
 #include "modules/bar/panel/bluetooth_panel.h"
 #include "modules/bar/panel/brightness_panel.h"
@@ -17,6 +16,9 @@
 #include "modules/bar/panel/media_panel.h"
 #include "modules/bar/panel/network_panel.h"
 #include "modules/bar/panel/tray_panel.h"
+#include "modules/bar/panel/volume_panel.h"
+#include "modules/bar/styles/continuous.h"
+#include "modules/bar/styles/okinami.h"
 #include "modules/bar/widget/battery_widget.h"
 #include "modules/bar/widget/bluetooth_widget.h"
 #include "modules/bar/widget/brightness_widget.h"
@@ -47,7 +49,7 @@ Bar::Bar(XConnection &x, EventLoop &loop, IpcServer &ipc, Services &services, co
     battery_ = std::make_unique<BatteryWidget>();
     tray_ = std::make_unique<TrayWidget>();
     items_ = {tray_.get(), network_.get(), bluetooth_.get(), volume_.get(), brightness_.get(), battery_.get(), media_.get(), clock_.get()};
-    height_ = bar_config::margin_top + bar_config::height;
+    refresh_style();
     apply_output(output.geometry);
     services_.i3.changed.connect([this] { draw_all(); });
     auto update = [this](Item item) {
@@ -64,7 +66,7 @@ Bar::Bar(XConnection &x, EventLoop &loop, IpcServer &ipc, Services &services, co
     services_.battery.changed.connect([update] { update(battery); });
     services_.brightness.changed.connect([update] { update(brightness); });
     brightness_panel_ = std::make_unique<BrightnessPanel>(x_, loop, services_.brightness);
-    audio_panel_ = std::make_unique<AudioPanel>(x_, loop, services_.audio);
+    volume_panel_ = std::make_unique<VolumePanel>(x_, loop, services_.audio);
     battery_panel_ = std::make_unique<BatteryPanel>(x_, loop, services_.battery);
     bluetooth_panel_ = std::make_unique<BluetoothPanel>(x_, loop, services_.bluetooth);
     network_panel_ = std::make_unique<NetworkPanel>(x_, loop, services_.network);
@@ -73,11 +75,11 @@ Bar::Bar(XConnection &x, EventLoop &loop, IpcServer &ipc, Services &services, co
     tray_panel_ = std::make_unique<TrayPanel>(x_, loop, services_.tray);
     for (std::size_t i = 0; i < item_count; ++i) {
         PanelWindow &panel = panel_window(static_cast<Item>(i));
-        panel.set_output(output.geometry);
         panel.changed.connect([this] { sync_panels(); });
         refresh(static_cast<Item>(i));
     }
 
+    apply_panel_geometry(output.geometry);
     clock_->refresh();
     draw_all();
 
@@ -114,23 +116,40 @@ Bar::Bar(XConnection &x, EventLoop &loop, IpcServer &ipc, Services &services, co
 
 Bar::~Bar() = default;
 
+bool Bar::refresh_style() {
+    BarStyle next = services_.settings.bar_style();
+    if (spec_ != nullptr && next == style_) {
+        return false;
+    }
+    style_ = next;
+    spec_ = &bar_style_spec(next);
+    height_ = static_cast<uint16_t>(bar_window_height(*spec_));
+    return true;
+}
+
 void Bar::apply_output(const OutputGeometry &output) {
     width_ = output.width;
-    panel_ = {bar_config::margin_x, bar_config::margin_top, width_ - 2 * bar_config::margin_x,
-              bar_config::height};
+    panel_ = bar_panel_rect(*spec_, width_);
     window_.place({output.x, output.y, width_, height_});
     set_hints(output);
 }
 
+void Bar::apply_panel_geometry(const OutputGeometry &output) {
+    for (std::size_t i = 0; i < item_count; ++i) {
+        PanelWindow &panel = panel_window(static_cast<Item>(i));
+        panel.set_output(output);
+        panel.set_top(bar_panel_top(*spec_));
+    }
+}
+
 void Bar::place(const Output &output) {
-    if (window_.mapped() && window_.geometry() == OutputGeometry{output.geometry.x, output.geometry.y, output.geometry.width, height_}) {
+    bool restyled = refresh_style();
+    if (!restyled && window_.mapped() && window_.geometry() == OutputGeometry{output.geometry.x, output.geometry.y, output.geometry.width, height_}) {
         return;
     }
     close_panels_except(nullptr);
     apply_output(output.geometry);
-    for (std::size_t i = 0; i < item_count; ++i) {
-        panel_window(static_cast<Item>(i)).set_output(output.geometry);
-    }
+    apply_panel_geometry(output.geometry);
     draw_all();
     window_.show(false);
 }
@@ -165,20 +184,20 @@ void Bar::paint_background(const Rect &rect) {
     cairo_set_operator(window_.cr(), CAIRO_OPERATOR_OVER);
 }
 
-void Bar::paint_panel() {
-    constexpr double inset = bar_config::border_width / 2.0;
-    set_source(window_.cr(), palette::base_alpha80);
-    rounded_rect(window_.cr(), panel_.x, panel_.y, panel_.width, panel_.height, bar_config::corner_radius);
-    cairo_fill(window_.cr());
-    set_source(window_.cr(), palette::accent);
-    cairo_set_line_width(window_.cr(), bar_config::border_width);
-    rounded_rect(window_.cr(), panel_.x + inset, panel_.y + inset, panel_.width - 2 * inset,
-                 panel_.height - 2 * inset, bar_config::corner_radius - inset);
-    cairo_stroke(window_.cr());
+void Bar::paint_frame() {
+    if (!bar_style_has_rail(*spec_)) {
+        paint_continuous(window_.cr(), *spec_, panel_);
+        return;
+    }
+    OkinamiFrame frame = bar_okinami_frame(*spec_, left_end_, center_span_, right_start_, width_);
+    paint_okinami(window_.cr(), *spec_, width_, panel_.height, frame);
 }
 
-void Bar::draw_divider(const Rect &left, const Rect &right) {
-    double x = (left.x + left.width + right.x) / 2.0;
+void Bar::add_divider(const Rect &left, const Rect &right) {
+    dividers_.push_back((left.x + left.width + right.x) / 2.0);
+}
+
+void Bar::draw_divider(double x) {
     double height = panel_.height * bar_config::divider_height_ratio;
     set_source(window_.cr(), palette::text_alpha20);
     cairo_rectangle(window_.cr(), std::floor(x), panel_.y + (panel_.height - height) / 2.0,
@@ -186,48 +205,69 @@ void Bar::draw_divider(const Rect &left, const Rect &right) {
     cairo_fill(window_.cr());
 }
 
+void Bar::layout() {
+    dividers_.clear();
+    constexpr int pad = bar_config::pill_pad;
+    constexpr int gap = bar_config::item_gap;
+    const double padding = spec_->padding;
+    logout_rect_ = {panel_.x + spec_->padding, panel_.y, logout_->width() + 2 * pad, panel_.height};
+    const I3Status &workspaces = services_.i3.status();
+    workspace_rect_ = {logout_rect_.x + logout_rect_.width + gap, panel_.y,
+                       workspace_row_width(workspaces) + 2 * pad, panel_.height};
+    add_divider(logout_rect_, workspace_rect_);
+    left_end_ = std::round(workspace_rect_.x + workspace_rect_.width + padding);
+
+    int media_width = media_->width() + 2 * pad;
+    int clock_width = clock_->width() + 2 * pad;
+    int center_x = panel_.x + (panel_.width - media_width - gap - clock_width) / 2;
+    item_rects_[media] = {center_x, panel_.y, media_width, panel_.height};
+    item_rects_[clock] = {center_x + media_width + gap, panel_.y, clock_width, panel_.height};
+    add_divider(item_rects_[media], item_rects_[clock]);
+    center_span_ = IslandSpan{std::round(item_rects_[media].x - padding),
+                              std::round(item_rects_[clock].x + item_rects_[clock].width + padding)};
+
+    int right = panel_.x + panel_.width - spec_->padding;
+    const Rect *right_neighbor = nullptr;
+    right_start_.reset();
+    for (std::size_t i = media; i-- > 0;) {
+        WidgetCapsule &item = *items_[i];
+        int item_width = item.visible() ? item.width() + 2 * pad : 0;
+        item_rects_[i] = {right - item_width, panel_.y, item_width, panel_.height};
+        if (item.visible()) {
+            if (right_neighbor != nullptr) {
+                add_divider(item_rects_[i], *right_neighbor);
+            }
+            right_neighbor = &item_rects_[i];
+            right_start_ = std::round(item_rects_[i].x - padding);
+            right -= item_width + gap;
+        }
+    }
+}
+
 void Bar::draw_all() {
-    Rect whole{0, 0, width_, height_};
     cairo_set_operator(window_.cr(), CAIRO_OPERATOR_SOURCE);
     cairo_set_source_rgba(window_.cr(), 0, 0, 0, 0);
     cairo_paint(window_.cr());
     cairo_set_operator(window_.cr(), CAIRO_OPERATOR_OVER);
-    paint_panel();
+    layout();
+    paint_frame();
 
     set_source(window_.cr(), palette::text);
-    logout_rect_ = {panel_.x + bar_config::padding_x, panel_.y, logout_->width(), panel_.height};
-    logout_->draw(window_.cr(), logout_rect_.x, panel_.y, panel_.height);
-    const I3Status &workspaces = services_.i3.status();
-    workspace_rect_ = {logout_rect_.x + logout_rect_.width + bar_config::group_gap, panel_.y,
-                       workspace_row_width(workspaces), panel_.height};
-    draw_workspace_row(window_.cr(), workspaces, workspace_rect_.x, panel_.y, panel_.height);
-    draw_divider(logout_rect_, workspace_rect_);
-
-    int center_x = panel_.x + (panel_.width - media_->width() - bar_config::item_gap - clock_->width()) / 2;
-    item_rects_[media] = {center_x, panel_.y, media_->width(), panel_.height};
-    item_rects_[clock] = {center_x + media_->width() + bar_config::item_gap, panel_.y, clock_->width(), panel_.height};
+    logout_->draw(window_.cr(), logout_rect_.x + bar_config::pill_pad, panel_.y, panel_.height);
+    draw_workspace_row(window_.cr(), services_.i3.status(), workspace_rect_.x + bar_config::pill_pad, panel_.y, panel_.height);
     set_source(window_.cr(), palette::text);
-    media_->draw(window_.cr(), item_rects_[media].x, panel_.y, panel_.height);
-    clock_->draw(window_.cr(), item_rects_[clock].x, panel_.y, panel_.height);
-    draw_divider(item_rects_[media], item_rects_[clock]);
-
-    int right = panel_.x + panel_.width - bar_config::padding_x;
-    const Rect *right_neighbor = nullptr;
+    media_->draw(window_.cr(), item_rects_[media].x + bar_config::pill_pad, panel_.y, panel_.height);
+    clock_->draw(window_.cr(), item_rects_[clock].x + bar_config::pill_pad, panel_.y, panel_.height);
     for (std::size_t i = media; i-- > 0;) {
-        WidgetCapsule &item = *items_[i];
-        int item_width = item.visible() ? item.width() : 0;
-        item_rects_[i] = {right - item_width, panel_.y, item_width, panel_.height};
-        if (item.visible()) {
+        if (items_[i]->visible()) {
             set_source(window_.cr(), palette::text);
-            item.draw(window_.cr(), item_rects_[i].x, panel_.y, panel_.height);
-            if (right_neighbor != nullptr) {
-                draw_divider(item_rects_[i], *right_neighbor);
-            }
-            right_neighbor = &item_rects_[i];
-            right -= item_width + bar_config::item_gap;
+            items_[i]->draw(window_.cr(), item_rects_[i].x + bar_config::pill_pad, panel_.y, panel_.height);
         }
     }
-    window_.present(whole.x, whole.y, whole.width, whole.height);
+    for (double x : dividers_) {
+        draw_divider(x);
+    }
+    window_.present(0, 0, width_, height_);
 }
 
 void Bar::redraw_clock() {
@@ -235,15 +275,16 @@ void Bar::redraw_clock() {
         return;
     }
     const Rect &rect = item_rects_[clock];
-    if (clock_->width() != rect.width) {
+    if (bar_style_has_rail(*spec_) || clock_->width() + 2 * bar_config::pill_pad != rect.width) {
         draw_all();
         return;
     }
     constexpr int border = static_cast<int>(bar_config::border_width);
-    Rect dirty{rect.x, panel_.y + border, rect.width, panel_.height - 2 * border};
+    int top = bar_style_has_rail(*spec_) ? 0 : border;
+    Rect dirty{rect.x, panel_.y + top, rect.width, panel_.height - top - border};
     paint_background(dirty);
     set_source(window_.cr(), palette::text);
-    clock_->draw(window_.cr(), rect.x, panel_.y, panel_.height);
+    clock_->draw(window_.cr(), rect.x + bar_config::pill_pad, panel_.y, panel_.height);
     window_.present(dirty.x, dirty.y, dirty.width, dirty.height);
 }
 
@@ -283,7 +324,7 @@ PanelWindow &Bar::panel_window(Item item) {
     case brightness:
         return brightness_panel_->window();
     case volume:
-        return audio_panel_->window();
+        return volume_panel_->window();
     case media:
         return media_panel_->window();
     case clock:
@@ -311,7 +352,7 @@ void Bar::toggle_panel(Item item) {
         brightness_panel_->toggle();
         break;
     case volume:
-        audio_panel_->toggle();
+        volume_panel_->toggle();
         break;
     case battery:
         battery_panel_->toggle();
@@ -339,7 +380,7 @@ void Bar::click(const xcb_button_press_event_t &event) {
         if (logout_rect_.contains(event.event_x)) {
             ipc_.dispatch("logout");
         } else if (workspace_rect_.contains(event.event_x)) {
-            if (auto index = workspace_at(services_.i3.status(), event.event_x - workspace_rect_.x)) {
+            if (auto index = workspace_at(services_.i3.status(), event.event_x - workspace_rect_.x - bar_config::pill_pad)) {
                 services_.i3.switch_to(*index);
             }
         }

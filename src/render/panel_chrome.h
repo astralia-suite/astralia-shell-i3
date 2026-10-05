@@ -55,7 +55,7 @@ void panel_draw_card(cairo_t *cr, double x, double y, double w, double h);
 int panel_draw_text(cairo_t *cr, const char *font, std::string_view text, double x, double top, double height, int max_width, const Color &color);
 int panel_text_width(const char *font, std::string_view text);
 PanelRect panel_draw_icon_button(cairo_t *cr, double x, double y, const char *icon, const Color &color);
-PanelRect panel_draw_toggle(cairo_t *cr, double x, double y, bool on);
+PanelRect panel_draw_toggle(cairo_t *cr, double x, double y, bool on, double knob = panel_config::toggle_height - 4.0, double inset = 2.0);
 double panel_draw_header(cairo_t *cr, double width, std::string_view title, std::vector<PanelHit> &hits, int close_action);
 double panel_content_top();
 void panel_draw_section(cairo_t *cr, double y, double height, std::string_view label);

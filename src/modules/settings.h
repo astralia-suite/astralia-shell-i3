@@ -11,6 +11,7 @@
 #include "core/keyboard.h"
 #include "core/x_connection.h"
 
+#include "modules/settings/bar_tab.h"
 #include "modules/settings/displays_tab.h"
 #include "modules/settings/layout.h"
 #include "modules/settings/wallpaper_tab.h"
@@ -26,7 +27,8 @@ class Settings {
     Settings(XConnection &x, EventLoop &loop, IpcServer &ipc, Services &services);
 
   private:
-    enum Tab : std::size_t { displays,
+    enum Tab : std::size_t { bar,
+                             displays,
                              wallpaper };
 
     void toggle();
@@ -48,6 +50,7 @@ class Settings {
     XWindow window_;
     Keyboard keyboard_;
     bool fonts_ = register_app_fonts();
+    BarTab bar_;
     DisplaysTab displays_;
     WallpaperTab wallpaper_;
     Tab tab_ = displays;

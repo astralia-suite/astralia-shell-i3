@@ -59,3 +59,4 @@ Drop an entry once newer knowledge fully supersedes it.
 - Batch repaints from worker results through a timer, and reschedule only when no repaint is pending. Rescheduling on each arrival delays the paint while results keep coming.
 - Run the thumbnail worker at nice `10`. On the X201's two cores, decoding otherwise competes with the UI thread.
 - A nested `Xephyr` shows no cursor and ignores XTest clicks for the shell. Click inside its window by hand.
+- Paint overlapping translucent shapes with outer borders, then `CAIRO_OPERATOR_SOURCE` inner fills. `OVER` double-darkens where shapes overlap.

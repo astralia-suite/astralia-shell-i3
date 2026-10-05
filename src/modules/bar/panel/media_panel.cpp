@@ -54,7 +54,7 @@ void MediaPanel::toggle() {
     }
     media_.poll_position();
     paint();
-    window_.open((window_.output().width - window_.width()) / 2, bar_config::panel_top);
+    window_.open((window_.output().width - window_.width()) / 2);
     loop_.reschedule(poll_timer_);
 }
 

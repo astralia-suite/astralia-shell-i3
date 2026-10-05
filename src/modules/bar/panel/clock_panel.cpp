@@ -93,7 +93,7 @@ void ClockPanel::toggle() {
         return;
     }
     paint();
-    window_.open((window_.output().width - window_.width()) / 2, bar_config::panel_top);
+    window_.open((window_.output().width - window_.width()) / 2);
 }
 
 void ClockPanel::handle(const xcb_generic_event_t &event) {

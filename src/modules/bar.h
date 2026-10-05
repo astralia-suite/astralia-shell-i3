@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <vector>
 #include <xcb/xcb.h>
 
 #include "app/services.h"
@@ -15,11 +16,12 @@
 #include "core/ipc.h"
 #include "core/x_connection.h"
 
+#include "modules/bar/styles/geometry.h"
+
 #include "render/x_window.h"
 
 namespace astralia {
 
-class AudioPanel;
 class BatteryPanel;
 class BatteryWidget;
 class BluetoothPanel;
@@ -36,6 +38,7 @@ class NetworkWidget;
 class PanelWindow;
 class TrayPanel;
 class TrayWidget;
+class VolumePanel;
 class VolumeWidget;
 class WidgetCapsule;
 
@@ -50,14 +53,7 @@ class Bar {
     void hide();
 
   private:
-    struct Rect {
-        int x;
-        int y;
-        int width;
-        int height;
-
-        bool contains(int px) const { return px >= x && px < x + width; }
-    };
+    using Rect = BarRect;
 
     enum Item : std::size_t { tray,
                               network,
@@ -71,9 +67,13 @@ class Bar {
 
     void apply_output(const OutputGeometry &output);
     void set_hints(const OutputGeometry &output);
+    bool refresh_style();
+    void apply_panel_geometry(const OutputGeometry &output);
     void paint_background(const Rect &rect);
-    void paint_panel();
-    void draw_divider(const Rect &left, const Rect &right);
+    void paint_frame();
+    void layout();
+    void add_divider(const Rect &left, const Rect &right);
+    void draw_divider(double x);
     void draw_all();
     void redraw_clock();
     void refresh(Item item);
@@ -96,7 +96,13 @@ class Bar {
     Services &services_;
     uint16_t width_;
     uint16_t height_;
+    BarStyle style_ = BarStyle::continuous;
+    const BarStyleSpec *spec_ = nullptr;
     Rect panel_{};
+    std::vector<double> dividers_;
+    std::optional<double> left_end_;
+    std::optional<IslandSpan> center_span_;
+    std::optional<double> right_start_;
     XWindow window_;
     std::unique_ptr<ClockWidget> clock_;
     std::unique_ptr<MediaWidget> media_;
@@ -109,7 +115,7 @@ class Bar {
     std::unique_ptr<TrayWidget> tray_;
     std::array<WidgetCapsule *, item_count> items_{};
     std::array<Rect, item_count> item_rects_{};
-    std::unique_ptr<AudioPanel> audio_panel_;
+    std::unique_ptr<VolumePanel> volume_panel_;
     std::unique_ptr<BatteryPanel> battery_panel_;
     std::unique_ptr<BluetoothPanel> bluetooth_panel_;
     std::unique_ptr<BrightnessPanel> brightness_panel_;

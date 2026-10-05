@@ -62,7 +62,7 @@
 
 ## `src/config/`
 
-- `bar_config.h`: Bar, widget and panel constants.
+- `bar_config.h`: `BarStyle` and its name/label tables, bar, Okinami, widget and panel constants.
 - `logout_config.h`: Logout overlay constants and actions.
 - `launcher_config.h`: Launcher constants and result types.
 - `polkit_config.h`: Polkit card constants and prompt texts.
@@ -73,7 +73,7 @@
 
 ## `src/modules/`
 
-- `bar.{h,cpp}`: Top bar on one output with logout, workspaces, media, clock, tray and status widgets; opens their panels.
+- `bar.{h,cpp}`: Top bar on one output with logout, workspaces, media, clock, tray and status widgets; lays them out, paints them through the active `BarStyle` and opens their panels. A style change re-places the window, strut and panel tops.
 - `bar_set.{h,cpp}`: Keeps one bar per enabled output, moving or hiding bars on output and settings changes.
 - `launcher.{h,cpp}`: App, file and command launcher overlay.
 - `logout.{h,cpp}`: Logout overlay with power action buttons.
@@ -81,10 +81,17 @@
 - `polkit.{h,cpp}`: Polkit password prompt.
 - `osd.{h,cpp}`: Brightness, volume and mic level popup.
 - `wallpaper.{h,cpp}`: Per-output desktop wallpaper.
-- `settings.{h,cpp}`: Settings overlay with the Displays and Wallpaper tabs.
+- `settings.{h,cpp}`: Settings overlay with the Bar, Displays and Wallpaper tabs.
+
+## `src/modules/bar/styles/`
+
+- `geometry.{h,cpp}`: `BarStyleSpec`, window height, panel rect and panel top per style, and the pure Okinami island and fillet placement; test-linked.
+- `continuous.{h,cpp}`: `continuous_style_spec` and `paint_continuous`, one rounded capsule with dividers.
+- `okinami.{h,cpp}`: `okinami_style_spec` and `paint_okinami`, the top rail with islands and concave fillets, punched with `CAIRO_OPERATOR_SOURCE`.
 
 ## `src/modules/bar/widget/`
 
+- `widget_capsule.{h,cpp}`: Icon and label widget with hover-revealed label.
 - `bar_widget.h`: Base for bar widgets with the bar's fonts.
 - `clock_widget.{h,cpp}`: Clock icon with date and time label.
 - `media_widget.{h,cpp}`: Media icon with label.
@@ -100,7 +107,7 @@
 ## `src/modules/bar/panel/`
 
 - `brightness_panel.{h,cpp}`: Brightness slider panel.
-- `audio_panel.{h,cpp}`: Output, input and per-app volume, mute and default device panel.
+- `volume_panel.{h,cpp}`: Output, input and per-app volume, mute and default device panel.
 - `battery_panel.{h,cpp}`: Battery state, time left and charge panel.
 - `bluetooth_panel.{h,cpp}`: Bluetooth power and device connect, pair and forget panel.
 - `media_panel.{h,cpp}`: Now-playing panel with art, track info, position and playback controls.
@@ -133,8 +140,9 @@
 
 ## `src/modules/settings/`
 
-- `layout.{h,cpp}`: Settings card size, rail tabs, chip row and thumbnail grid geometry and hit-testing.
-- `widgets.{h,cpp}`: Output chip row and toggle tile drawing.
+- `layout.{h,cpp}`: Settings card size, header, close button, profile block, collapsing rail, chip row and thumbnail grid geometry and hit-testing.
+- `widgets.{h,cpp}`: Settings card, profile block, nav rail, choice tile, output chip row and toggle tile drawing.
+- `bar_tab.{h,cpp}`: Bar style selector tiles.
 - `displays_tab.{h,cpp}`: Per-output bar, OSD and notification toggles with default override.
 - `wallpaper_tab.{h,cpp}`: Folder field, image grid and per-output wallpaper picking.
 - `thumbnail_cache.{h,cpp}`: Loads visible wallpaper thumbnails on a low-priority worker thread and keeps them as X-side surfaces.
@@ -148,7 +156,6 @@
 - `app_icon.{h,cpp}`: Finds and loads application icons from the icon theme.
 - `image_decode.{h,cpp}`: Decodes raster and SVG images, JPEGs at reduced size, crops covers to a box and writes JPEGs.
 - `cover_cache.{h,cpp}`: Loads images cropped to a box size from an on-disk JPEG or PNG cache, pruned by age and size.
-- `widget_capsule.{h,cpp}`: Icon and label widget with hover-revealed label.
 - `draw.{h,cpp}`: Shared cairo drawing helpers.
 - `x_window.{h,cpp}`: Drawable X window.
 - `panel_chrome.{h,cpp}`: Shared panel constants and drawing pieces.
@@ -159,7 +166,8 @@
 
 - `i3_service.{h,cpp}`: i3 workspace state and switching.
 - `output_service.{h,cpp}`: RandR output list and change notifications.
-- `settings_service.{h,cpp}`: Creates, reads, writes and watches `settings.conf`.
+- `settings_service.{h,cpp}`: Creates, reads, writes and watches `settings.conf`, including the bar style.
+- `user_service.{h,cpp}`: Display name and uptime text for the settings profile block.
 - `wallpaper_service.{h,cpp}`: Reads, writes and watches `wallpaper.conf`.
 - `bluetooth_service.{h,cpp}`: Bluetooth adapter and device state and control.
 - `network_service.{h,cpp}`: Network state and Wi-Fi control.

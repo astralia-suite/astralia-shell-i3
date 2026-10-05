@@ -21,7 +21,8 @@ class PanelWindow {
     PanelWindow(XConnection &x, EventLoop &loop, std::string_view name, int width, int max_height, Handler handler, std::function<void()> closed);
 
     bool is_open() const { return open_; }
-    void open(int right_margin, int top);
+    void open(int right_margin);
+    void set_top(int top) { top_ = top; }
     void close();
     void set_height(int height);
     int width() const { return width_; }
@@ -52,6 +53,7 @@ class PanelWindow {
     int width_;
     int height_;
     int max_height_;
+    int top_ = 0;
     OutputGeometry output_;
     OutputGeometry anchor_{0, 0, 1, 1};
     XWindow window_;

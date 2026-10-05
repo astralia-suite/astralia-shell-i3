@@ -5,7 +5,7 @@
 
 #include "config/bar_config.h"
 
-#include "modules/bar/panel/audio_panel.h"
+#include "modules/bar/panel/volume_panel.h"
 
 #include "render/icons.h"
 #include "render/slider.h"
@@ -77,7 +77,7 @@ const char *node_icon(const AudioNode &node) {
 
 } // namespace
 
-AudioPanel::AudioPanel(XConnection &x, EventLoop &loop, AudioService &audio)
+VolumePanel::VolumePanel(XConnection &x, EventLoop &loop, AudioService &audio)
     : audio_(audio),
       window_(x, loop, "astralia-audio-panel", bar_config::panel_width, bar_config::panel_max_height, [this](const xcb_generic_event_t &event) { handle(event); }, [this] {
                   dragging_.reset();
@@ -91,16 +91,16 @@ AudioPanel::AudioPanel(XConnection &x, EventLoop &loop, AudioService &audio)
     });
 }
 
-void AudioPanel::toggle() {
+void VolumePanel::toggle() {
     if (window_.is_open()) {
         window_.close();
         return;
     }
     paint();
-    window_.open(bar_config::margin_x, bar_config::panel_top);
+    window_.open(bar_config::margin_x);
 }
 
-void AudioPanel::handle(const xcb_generic_event_t &event) {
+void VolumePanel::handle(const xcb_generic_event_t &event) {
     switch (event.response_type & ~0x80) {
     case XCB_KEY_PRESS: {
         const auto &key = reinterpret_cast<const xcb_key_press_event_t &>(event);
@@ -145,14 +145,14 @@ void AudioPanel::handle(const xcb_generic_event_t &event) {
     }
 }
 
-void AudioPanel::hover(uint32_t id) {
+void VolumePanel::hover(uint32_t id) {
     if (id != hovered_) {
         hovered_ = id;
         paint();
     }
 }
 
-void AudioPanel::press(int x, int y, xcb_button_t button) {
+void VolumePanel::press(int x, int y, xcb_button_t button) {
     std::optional<PanelHit> hit = panel_hit_at(hits_, x, y);
     uint32_t id = hit && !hit->tag.empty() ? static_cast<uint32_t>(std::stoul(hit->tag)) : 0;
     if (button == XCB_BUTTON_INDEX_4 || button == XCB_BUTTON_INDEX_5) {
@@ -193,20 +193,20 @@ void AudioPanel::press(int x, int y, xcb_button_t button) {
     }
 }
 
-void AudioPanel::step(uint32_t id, int delta) {
+void VolumePanel::step(uint32_t id, int delta) {
     if (std::optional<AudioNode> node = audio_.node(id)) {
         set_percent(id, std::clamp(node->percent + delta, 0, 100));
     }
 }
 
-void AudioPanel::set_percent(uint32_t id, int percent) {
+void VolumePanel::set_percent(uint32_t id, int percent) {
     std::optional<AudioNode> node = audio_.node(id);
     if (node && node->percent != percent) {
         audio_.set_volume(id, percent);
     }
 }
 
-void AudioPanel::paint() {
+void VolumePanel::paint() {
     cairo_t *cr = window_.cr();
     double width = window_.width();
     constexpr double pad = panel_config::padding;

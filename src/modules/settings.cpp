@@ -9,7 +9,10 @@
 
 #include "modules/settings.h"
 
+#include "modules/settings/widgets.h"
+
 #include "render/draw.h"
+#include "render/icons.h"
 
 namespace astralia {
 
@@ -22,7 +25,7 @@ namespace cfg = settings_config;
 Settings::Settings(XConnection &x, EventLoop &loop, IpcServer &ipc, Services &services)
     : x_(x), loop_(loop), services_(services),
       window_(x, "astralia-settings", XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_FOCUS_CHANGE),
-      keyboard_(x.conn()), displays_(services),
+      keyboard_(x.conn()), bar_(services), displays_(services),
       wallpaper_(services, loop, [this] {
           if (!repaint_pending_) {
               repaint_pending_ = true;
@@ -165,10 +168,10 @@ void Settings::key(const KeyEvent &event) {
         close();
         return;
     case KeyKind::up:
-        select(displays);
+        select(tab_ == bar ? bar : static_cast<Tab>(tab_ - 1));
         break;
     case KeyKind::down:
-        select(wallpaper);
+        select(tab_ == wallpaper ? wallpaper : static_cast<Tab>(tab_ + 1));
         break;
     default:
         return;
@@ -177,6 +180,10 @@ void Settings::key(const KeyEvent &event) {
 }
 
 void Settings::click(double x, double y) {
+    if (geometry_.close.contains(x, y)) {
+        close();
+        return;
+    }
     if (std::optional<std::size_t> index = settings_tab_at(geometry_, x, y)) {
         if (tab_ == wallpaper) {
             wallpaper_.click(std::nullopt);
@@ -186,7 +193,8 @@ void Settings::click(double x, double y) {
         return;
     }
     std::optional<PanelHit> hit = panel_hit_at(hits_, x, y);
-    bool changed = tab_ == displays ? displays_.click(hit) : wallpaper_.click(hit);
+    bool changed = tab_ == bar ? bar_.click(hit) : tab_ == displays ? displays_.click(hit)
+                                                                    : wallpaper_.click(hit);
     if (changed) {
         paint();
     }
@@ -212,24 +220,23 @@ void Settings::paint() {
     auto start = std::chrono::steady_clock::now();
     cairo_t *cr = window_.cr();
     window_.clear();
-    panel_draw_card(cr, geometry_.card.x, geometry_.card.y, geometry_.card.w, geometry_.card.h);
+    settings_draw_card(cr, geometry_.card);
 
-    panel_draw_text(cr, panel_config::title_font, "Settings", geometry_.rail.x + cfg::rail_padding + cfg::tab_text_inset, geometry_.rail.y + cfg::rail_padding, cfg::rail_title_height, 0, palette::text);
-    set_source(cr, palette::text_alpha15);
-    cairo_rectangle(cr, geometry_.rail.w, cfg::content_padding, 1.0, geometry_.card.h - 2 * cfg::content_padding);
+    panel_draw_text(cr, panel_config::title_font, "Settings", geometry_.header.x, geometry_.header.y, geometry_.header.h, 0, palette::text);
+    panel_draw_icon_button(cr, geometry_.close.x, geometry_.close.y, icon::close, palette::text);
+    set_source(cr, palette::text_alpha11);
+    cairo_rectangle(cr, geometry_.header.x, geometry_.header_divider_y, geometry_.header.w, 1.0);
     cairo_fill(cr);
-    for (std::size_t i = 0; i < cfg::tab_count; ++i) {
-        PanelRect rect = settings_tab_rect(geometry_, i);
-        if (i == tab_) {
-            set_source(cr, palette::accent_alpha25);
-            rounded_rect(cr, rect.x, rect.y, rect.w, rect.h, cfg::tile_radius);
-            cairo_fill(cr);
-        }
-        panel_draw_text(cr, panel_config::font, cfg::tab_labels[i], rect.x + cfg::tab_text_inset, rect.y, rect.h, static_cast<int>(rect.w - 2 * cfg::tab_text_inset), i == tab_ ? palette::text : palette::text_muted);
-    }
+
+    settings_draw_profile(cr, geometry_, services_.user.name(), services_.user.uptime());
+    settings_draw_rail(cr, geometry_, tab_);
+    cairo_rectangle(cr, geometry_.divider_x, geometry_.content.y, 1.0, geometry_.rail.y + geometry_.rail.h - geometry_.content.y);
+    cairo_fill(cr);
 
     hits_.clear();
-    if (tab_ == displays) {
+    if (tab_ == bar) {
+        bar_.paint(cr, geometry_.content, hits_);
+    } else if (tab_ == displays) {
         displays_.paint(cr, geometry_.content, hits_);
     } else {
         wallpaper_.paint(cr, geometry_.content, hits_);

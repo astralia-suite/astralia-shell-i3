@@ -11,8 +11,14 @@ namespace astralia {
 
 struct SettingsGeometry {
     PanelRect card;
+    PanelRect header;
+    PanelRect close;
+    PanelRect profile;
     PanelRect rail;
     PanelRect content;
+    double divider_x = 0;
+    double header_divider_y = 0;
+    bool expanded = true;
 };
 
 std::pair<int, int> settings_window_size(int output_width, int output_height);

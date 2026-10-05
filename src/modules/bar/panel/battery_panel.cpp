@@ -41,7 +41,7 @@ void BatteryPanel::toggle() {
         return;
     }
     paint();
-    window_.open(bar_config::margin_x, bar_config::panel_top);
+    window_.open(bar_config::margin_x);
 }
 
 void BatteryPanel::handle(const xcb_generic_event_t &event) {

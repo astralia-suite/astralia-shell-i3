@@ -68,15 +68,14 @@ PanelRect panel_draw_icon_button(cairo_t *cr, double x, double y, const char *ic
     return {x, y, size, size};
 }
 
-PanelRect panel_draw_toggle(cairo_t *cr, double x, double y, bool on) {
+PanelRect panel_draw_toggle(cairo_t *cr, double x, double y, bool on, double knob, double inset) {
     constexpr double w = panel_config::toggle_width;
     constexpr double h = panel_config::toggle_height;
-    constexpr double knob = h - 4.0;
     set_source(cr, on ? palette::accent : palette::text_alpha20);
     rounded_rect(cr, x, y, w, h, h / 2.0);
     cairo_fill(cr);
     set_source(cr, palette::text);
-    double knob_x = on ? x + w - 2.0 - knob : x + 2.0;
+    double knob_x = on ? x + w - inset - knob : x + inset;
     cairo_arc(cr, knob_x + knob / 2.0, y + h / 2.0, knob / 2.0, 0.0, 2.0 * std::numbers::pi);
     cairo_fill(cr);
     return {x, y, w, h};

@@ -1,4 +1,4 @@
-#include "render/widget_capsule.h"
+#include "modules/bar/widget/widget_capsule.h"
 
 namespace astralia {
 

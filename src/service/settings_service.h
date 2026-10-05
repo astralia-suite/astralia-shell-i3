@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "config/bar_config.h"
 #include "config/settings_config.h"
 
 #include "core/config_file.h"
@@ -25,6 +26,7 @@ inline constexpr std::size_t feature_count = 3;
 struct SettingsFile {
     std::array<bool, feature_count> defaults{true, true, true};
     std::unordered_map<std::string, std::array<std::optional<bool>, feature_count>> overrides;
+    BarStyle bar_style = BarStyle::continuous;
     std::string wallpaper_dir = settings_config::default_wallpaper_dir;
     std::vector<std::size_t> invalid_lines;
 
@@ -46,6 +48,8 @@ class SettingsService {
     void set_override(const std::string &output, bool on);
     const std::string &wallpaper_dir() const { return file_.wallpaper_dir; }
     void set_wallpaper_dir(const std::string &dir);
+    BarStyle bar_style() const { return file_.bar_style; }
+    void set_bar_style(BarStyle style);
 
     Signal<> changed;
 

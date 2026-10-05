@@ -15,9 +15,9 @@
 
 namespace astralia {
 
-class AudioPanel {
+class VolumePanel {
   public:
-    AudioPanel(XConnection &x, EventLoop &loop, AudioService &audio);
+    VolumePanel(XConnection &x, EventLoop &loop, AudioService &audio);
 
     void toggle();
     PanelWindow &window() { return window_; }

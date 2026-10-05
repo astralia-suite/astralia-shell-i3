@@ -41,7 +41,7 @@ void BrightnessPanel::sync() {
 void BrightnessPanel::open() {
     sync();
     paint();
-    window_.open(bar_config::margin_x, bar_config::panel_top);
+    window_.open(bar_config::margin_x);
 }
 
 void BrightnessPanel::handle(const xcb_generic_event_t &event) {

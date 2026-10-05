@@ -1,30 +1,47 @@
 #pragma once
 
+#include <array>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
 
 #include "render/palette.h"
 
+namespace astralia {
+
+enum class BarStyle : std::size_t { continuous,
+                                    okinami };
+
+} // namespace astralia
+
 namespace astralia::bar_config {
+
+// Styles
+inline constexpr std::size_t style_count = 2;
+inline constexpr std::array<const char *, style_count> style_names{"continuous", "okinami"};
+inline constexpr std::array<const char *, style_count> style_labels{"Continuous", "Okinami"};
 
 // Geometry
 inline constexpr uint16_t height = 40;
 inline constexpr uint16_t margin_x = 20;
 inline constexpr uint16_t margin_top = 10;
-inline constexpr double corner_radius = height / 2.0;
-inline constexpr int padding_x = height / 2;
-inline constexpr int group_gap = 16;
-inline constexpr int item_gap = 14;
-inline constexpr int label_gap = 6;
+inline constexpr int pill_pad = height / 4;
+inline constexpr int item_gap = 10;
+inline constexpr int label_gap = 10;
 inline constexpr float border_width = metrics::border_thin;
+
+// Okinami
+inline constexpr double rail_height = 6.0;
+inline constexpr double island_radius = 16.0;
+inline constexpr double fillet_radius = 12.0;
+inline constexpr int island_padding = 6;
 
 // Workspace pills
 inline constexpr uint32_t workspace_count = 10;
-inline constexpr int pill_height = 10;
-inline constexpr int pill_width = 10;
-inline constexpr int pill_active_width = 26;
-inline constexpr int pill_spacing = 6;
+inline constexpr int pill_height = 12;
+inline constexpr int pill_width = 12;
+inline constexpr int pill_active_width = 24;
+inline constexpr int pill_spacing = 5;
 
 // Dividers
 inline constexpr double divider_height_ratio = 0.4;
@@ -46,7 +63,7 @@ inline constexpr int panel_slider_height = 32;
 inline constexpr int panel_empty_height = 60;
 inline constexpr int panel_card_gap = 8;
 inline constexpr int panel_scroll_step = 40;
-inline constexpr int panel_top = 2 * margin_top + height;
+inline constexpr int panel_gap = 10;
 inline constexpr int panel_percent_width = 56;
 inline constexpr int panel_volume_step = 5;
 inline constexpr std::size_t panel_password_min = 8;
@@ -99,8 +116,8 @@ inline constexpr int tray_menu_row_padding = 10;
 inline constexpr int tray_menu_offset = 4;
 
 // Typography
-inline constexpr const char *font = "Comic Shanns Mono 15";
-inline constexpr const char *icon_font = "tabler-icons 17";
+inline constexpr const char *font = "Comic Shanns Mono 13";
+inline constexpr const char *icon_font = "tabler-icons 13.5";
 
 // Content
 inline constexpr const char *clock_format = "%a %Y-%m-%d %H:%M:%S";

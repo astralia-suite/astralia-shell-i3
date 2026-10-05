@@ -30,6 +30,15 @@ std::optional<bool> flag_from(std::string_view value) {
     return std::nullopt;
 }
 
+std::optional<BarStyle> bar_style_from(std::string_view value) {
+    for (std::size_t i = 0; i < bar_config::style_count; ++i) {
+        if (bar_config::style_names[i] == value) {
+            return static_cast<BarStyle>(i);
+        }
+    }
+    return std::nullopt;
+}
+
 std::string_view flag_text(bool value) { return value ? "on" : "off"; }
 
 std::string initial_text(const std::string &path) {
@@ -59,6 +68,14 @@ SettingsFile parse_settings_file(std::string_view text) {
     for (const ConfigEntry &entry : lines.entries) {
         if (entry.key == settings_config::wallpaper_dir_key) {
             file.wallpaper_dir = entry.value;
+            continue;
+        }
+        if (entry.key == settings_config::bar_style_key) {
+            if (std::optional<BarStyle> style = bar_style_from(entry.value)) {
+                file.bar_style = *style;
+            } else {
+                file.invalid_lines.push_back(entry.line);
+            }
             continue;
         }
         std::size_t dot = entry.key.rfind('.');
@@ -94,7 +111,7 @@ SettingsService::SettingsService(EventLoop &loop)
     : path_(user_config_path(settings_config::file)), text_(initial_text(path_)),
       file_(parse_settings_file(text_)), watch_(loop, path_, [this] { reload(); }) {
     for (std::size_t line : file_.invalid_lines) {
-        log::error("{}:{}: expected `key = on|off`", path_, line);
+        log::error("{}:{}: expected `key = on|off`, `bar_style = continuous|okinami`", path_, line);
     }
 }
 
@@ -132,6 +149,10 @@ void SettingsService::set_wallpaper_dir(const std::string &dir) {
         return;
     }
     store(with_entry(text_, settings_config::wallpaper_dir_key, dir));
+}
+
+void SettingsService::set_bar_style(BarStyle style) {
+    store(with_entry(text_, settings_config::bar_style_key, bar_config::style_names[static_cast<std::size_t>(style)]));
 }
 
 void SettingsService::store(std::string text) {

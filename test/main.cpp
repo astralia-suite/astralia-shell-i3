@@ -25,6 +25,8 @@
 #include "modules/bar/panel/clock_panel.h"
 #include "modules/bar/panel/network_panel.h"
 #include "modules/bar/panel/tray_panel.h"
+#include "modules/bar/styles/geometry.h"
+#include "modules/bar/styles/okinami.h"
 #include "modules/bar/widget/battery_widget.h"
 #include "modules/bar/widget/bluetooth_widget.h"
 #include "modules/bar/widget/clock_widget.h"
@@ -212,7 +214,7 @@ void check_status_changes() {
 void check_workspace_row() {
     using astralia::workspace_at;
     astralia::I3Status status{3, 1};
-    check(astralia::workspace_row_width(status) == 10 + 6 + 26 + 6 + 10, "active pill is wider");
+    check(astralia::workspace_row_width(status) == 12 + 5 + 24 + 5 + 12, "active pill is wider");
     check(workspace_at(status, 0) == 0u, "first pill");
     check(workspace_at(status, 20) == 1u, "active pill");
     check(workspace_at(status, 50) == 2u, "last pill");
@@ -327,6 +329,7 @@ void check_settings_file() {
               astralia::feature_enabled(file, Feature::notifications, "DP-1"),
           "defaults enable every feature");
     check(file.wallpaper_dir == "~/Pictures", "default wallpaper folder");
+    check(file.bar_style == astralia::BarStyle::continuous, "default bar style");
 
     file = astralia::parse_settings_file("bar = off\nHDMI-A-1.bar = on\nHDMI-A-1.osd = off\n"
                                          "wallpaper_dir = /w\nosd = maybe\nfoo.baz = on\n.bar = on\n");
@@ -336,21 +339,76 @@ void check_settings_file() {
     check(astralia::feature_enabled(file, Feature::osd, "DP-1"), "other outputs keep the default");
     check(file.wallpaper_dir == "/w", "wallpaper folder is read");
     check(file.invalid_lines == std::vector<std::size_t>{5, 6, 7}, "bad values and keys are reported");
+    check(file.bar_style == astralia::BarStyle::continuous, "bar style falls back when missing");
+    file = astralia::parse_settings_file("bar_style = okinami\n");
+    check(file.bar_style == astralia::BarStyle::okinami && file.invalid_lines.empty(), "bar style is read");
+    file = astralia::parse_settings_file("bar_style = round\n");
+    check(file.bar_style == astralia::BarStyle::continuous && file.invalid_lines == std::vector<std::size_t>{1}, "an unknown bar style is reported");
     check(astralia::feature_key(Feature::notifications, "") == "notifications", "default key");
     check(astralia::feature_key(Feature::osd, "DP-1") == "DP-1.osd", "override key");
 }
 
+void check_bar_styles() {
+    using namespace astralia;
+    const BarStyleSpec &continuous = bar_style_spec(BarStyle::continuous);
+    const BarStyleSpec &okinami = bar_style_spec(BarStyle::okinami);
+    check(!bar_style_has_rail(continuous) && bar_style_has_rail(okinami), "only okinami has a rail");
+    check(bar_window_height(continuous) == 50 && bar_window_height(okinami) == 40, "window heights");
+    check(bar_panel_top(continuous) == 60 && bar_panel_top(okinami) == 50, "panels open below the bar");
+    BarRect capsule = bar_panel_rect(continuous, 1000);
+    check(capsule.x == 20 && capsule.y == 10 && capsule.width == 960 && capsule.height == 40, "continuous panel is inset");
+    BarRect flat = bar_panel_rect(okinami, 1000);
+    check(flat.x == 0 && flat.y == 0 && flat.width == 1000 && flat.height == 40, "okinami panel spans the output");
+
+    IslandShape left = bar_island_shape(okinami, 0, 100, true, false);
+    check(left.outer_x == -16 && left.outer_width == 116 && left.inner_x == -16 && left.inner_width == 114, "flush-left island");
+    IslandShape middle = bar_island_shape(okinami, 100, 200, false, false);
+    check(middle.outer_x == 100 && middle.outer_width == 100 && middle.inner_x == 102 && middle.inner_width == 96, "middle island is inset by the border");
+    IslandShape right = bar_island_shape(okinami, 300, 400, false, true);
+    check(right.outer_x == 300 && right.outer_width == 116 && right.inner_x == 302 && right.inner_width == 114, "flush-right island");
+
+    OkinamiFrame frame = bar_okinami_frame(okinami, 100, IslandSpan{150, 250}, 300, 400);
+    check(frame.islands.size() == 3 && frame.fillets.size() == 4, "three islands and four fillets");
+    check(frame.fillets[0].edge_x == 100 && frame.fillets[0].right_of_island && frame.fillets[1].edge_x == 150 && !frame.fillets[1].right_of_island &&
+              frame.fillets[2].edge_x == 250 && frame.fillets[2].right_of_island && frame.fillets[3].edge_x == 300 && !frame.fillets[3].right_of_island,
+          "fillets sit on island edges");
+    OkinamiFrame empty = bar_okinami_frame(okinami, std::nullopt, std::nullopt, std::nullopt, 400);
+    check(empty.islands.empty() && empty.fillets.empty(), "no groups, no islands");
+
+    cairo_surface_t *surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 400, 40);
+    cairo_t *cr = cairo_create(surface);
+    paint_okinami(cr, okinami, 400, 40, frame);
+    cairo_surface_flush(surface);
+    const unsigned char *data = cairo_image_surface_get_data(surface);
+    int stride = cairo_image_surface_get_stride(surface);
+    auto alpha = [&](int x, int y) { return static_cast<int>(data[y * stride + x * 4 + 3]); };
+    check(alpha(50, 2) == 204 && alpha(125, 2) == 204, "rail and island overlap share one alpha");
+    check(alpha(125, 5) == 255, "rail border line is opaque");
+    check(alpha(50, 5) == 204 && alpha(50, 20) == 204, "island interior replaces the rail line");
+    check(alpha(125, 20) == 0, "the gap under the rail is transparent");
+    cairo_destroy(cr);
+    cairo_surface_destroy(surface);
+}
+
 void check_settings_layout() {
     using namespace astralia;
-    check(settings_window_size(1920, 1080) == std::pair<int, int>{860, 540}, "a large output caps the card");
+    check(settings_window_size(1920, 1080) == std::pair<int, int>{920, 680}, "a large output caps the card");
     check(settings_window_size(600, 400) == std::pair<int, int>{520, 320}, "a small output leaves a margin");
     SettingsGeometry geometry = settings_geometry(760, 540);
-    check(geometry.content.x == 190 && geometry.content.w == 550 && geometry.content.h == 500,
+    check(geometry.expanded && geometry.rail.w == 200, "a wide card expands the rail");
+    check(geometry.content.x == 252 && geometry.content.w == 488 && geometry.content.y == 63 && geometry.content.h == 457,
           "content sits right of the rail inside the padding");
-    check(settings_tab_at(geometry, 20, geometry.rail.y + 12 + 44 + 10) == 0u, "first tab");
-    check(settings_tab_at(geometry, 20, geometry.rail.y + 12 + 44 + 36 + 4 + 10) == 1u, "second tab");
-    check(!settings_tab_at(geometry, 20, 5), "above the tabs");
-    check(!settings_tab_at(geometry, 400, 70), "right of the rail");
+    check(geometry.close.x == 714 && geometry.close.y == 22, "close button sits at the header's right end");
+    check(geometry.rail.y == 177, "rail sits below the profile block");
+    check(settings_tab_at(geometry, 30, geometry.rail.y + 10 + 10) == 0u, "first tab");
+    check(settings_tab_at(geometry, 30, geometry.rail.y + 10 + 36 + 4 + 10) == 1u, "second tab");
+    check(settings_tab_at(geometry, 30, geometry.rail.y + 10 + 2 * (36 + 4) + 10) == 2u, "third tab");
+    check(!settings_tab_at(geometry, 30, 5), "above the tabs");
+    check(!settings_tab_at(geometry, 400, 200), "right of the rail");
+    SettingsGeometry narrow = settings_geometry(600, 400);
+    check(!narrow.expanded && narrow.rail.w == 64 && narrow.rail.y == 131, "a narrow card collapses the rail");
+    check(narrow.content.x == 116 && narrow.content.w == 464, "content widens when the rail collapses");
+    check(settings_tab_at(narrow, 30, narrow.rail.y + 10 + 5) == 0u, "first tab in the collapsed rail");
 
     std::vector<PanelRect> chips = settings_chip_rects(3, {10, 20, 492, 400});
     check(chips.size() == 3 && chips[0].x == 10 && chips[0].w == 160 && chips[1].x == 176 &&
@@ -661,6 +719,7 @@ int main() {
     check_wallpaper_file();
     check_config_file();
     check_cover_cache();
+    check_bar_styles();
     check_settings_layout();
     check_settings_file();
     check_launcher_text();

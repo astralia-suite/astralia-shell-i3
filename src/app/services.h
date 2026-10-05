@@ -16,6 +16,7 @@
 #include "service/polkit_service.h"
 #include "service/settings_service.h"
 #include "service/tray_service.h"
+#include "service/user_service.h"
 #include "service/wallpaper_service.h"
 
 namespace astralia {
@@ -40,6 +41,7 @@ struct Services {
     OutputService outputs;
     SettingsService settings;
     WallpaperService wallpaper;
+    UserService user;
 };
 
 } // namespace astralia

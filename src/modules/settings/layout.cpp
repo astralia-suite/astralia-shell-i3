@@ -27,19 +27,37 @@ std::pair<int, int> settings_window_size(int output_width, int output_height) {
 
 SettingsGeometry settings_geometry(int width, int height) {
     SettingsGeometry geometry;
-    geometry.card = {0, 0, static_cast<double>(width), static_cast<double>(height)};
-    geometry.rail = {0, 0, cfg::rail_width, static_cast<double>(height)};
-    geometry.content = {cfg::rail_width + cfg::content_padding, cfg::content_padding,
-                        width - cfg::rail_width - 2 * cfg::content_padding,
-                        height - 2 * cfg::content_padding};
+    auto w = static_cast<double>(width);
+    auto h = static_cast<double>(height);
+    constexpr double pad = cfg::card_padding;
+    constexpr double button = panel_config::button_size;
+    geometry.expanded = width > cfg::rail_collapse_breakpoint;
+    double rail_w = geometry.expanded ? cfg::rail_expanded_width : cfg::rail_collapsed_width;
+
+    geometry.card = {0, 0, w, h};
+    geometry.header = {pad, pad, w - 2 * pad, panel_config::header_height};
+    geometry.close = {w - pad - button, pad + (panel_config::header_height - button) / 2.0, button, button};
+    geometry.header_divider_y = pad + panel_config::header_height + cfg::header_divider_gap;
+    double top = geometry.header_divider_y + 1.0 + cfg::content_gap;
+
+    double profile_h = cfg::profile_top_padding + cfg::avatar_size;
+    if (geometry.expanded) {
+        profile_h += cfg::profile_label_gap + cfg::profile_name_height + cfg::profile_line_gap + cfg::profile_uptime_height;
+    }
+    profile_h += cfg::profile_bottom_padding;
+    geometry.profile = {pad, top, rail_w, profile_h};
+
+    double rail_y = top + profile_h + cfg::profile_divider_gap;
+    geometry.rail = {pad, rail_y, rail_w, h - pad - rail_y};
+    geometry.divider_x = pad + rail_w + cfg::rail_divider_gap;
+    double content_x = geometry.divider_x + cfg::rail_divider_gap;
+    geometry.content = {content_x, top, w - pad - content_x, h - pad - top};
     return geometry;
 }
 
 PanelRect settings_tab_rect(const SettingsGeometry &geometry, std::size_t index) {
-    double top = geometry.rail.y + cfg::rail_padding + cfg::rail_title_height;
-    return {geometry.rail.x + cfg::rail_padding,
-            top + static_cast<double>(index) * (cfg::tab_height + cfg::tab_gap),
-            geometry.rail.w - 2 * cfg::rail_padding, cfg::tab_height};
+    return {geometry.rail.x, geometry.rail.y + cfg::rail_padding + static_cast<double>(index) * (cfg::tab_height + cfg::tab_gap),
+            geometry.rail.w, cfg::tab_height};
 }
 
 std::optional<std::size_t> settings_tab_at(const SettingsGeometry &geometry, double x, double y) {

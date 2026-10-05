@@ -26,9 +26,9 @@ void PanelWindow::place() {
     window_.place(geometry, static_cast<uint16_t>(width_), static_cast<uint16_t>(max_height_));
 }
 
-void PanelWindow::open(int right_margin, int top) {
+void PanelWindow::open(int right_margin) {
     anchor_.x = static_cast<int16_t>(output_.x + output_.width - right_margin - width_);
-    anchor_.y = static_cast<int16_t>(output_.y + top);
+    anchor_.y = static_cast<int16_t>(output_.y + top_);
     place();
     keyboard_.reload();
     open_ = true;
