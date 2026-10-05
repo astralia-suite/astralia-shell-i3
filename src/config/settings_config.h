@@ -23,6 +23,9 @@ inline constexpr const char *default_text =
 inline constexpr const char *wallpaper_dir_key = "wallpaper_dir";
 inline constexpr const char *bar_style_key = "bar_style";
 
+// Focus
+inline constexpr std::chrono::milliseconds relayout_grace{500};
+
 // Window
 inline constexpr int card_max_width = 920;
 inline constexpr int card_max_height = 680;

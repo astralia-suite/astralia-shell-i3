@@ -49,7 +49,10 @@ Settings::Settings(XConnection &x, EventLoop &loop, IpcServer &ipc, Services &se
                  return std::string();
              },
              "toggle the settings overlay"});
-    services.settings.changed.connect([this] { sync(); });
+    services.settings.changed.connect([this] {
+        refocus_until_ = std::chrono::steady_clock::now() + settings_config::relayout_grace;
+        sync();
+    });
     services.wallpaper.changed.connect([this] { sync(); });
     services.outputs.changed.connect([this] { sync(); });
 }
@@ -133,7 +136,12 @@ void Settings::handle(const xcb_generic_event_t &event) {
     }
     case XCB_FOCUS_OUT: {
         const auto &focus = reinterpret_cast<const xcb_focus_out_event_t &>(event);
-        if (focus.mode == XCB_NOTIFY_MODE_NORMAL && focus.detail != XCB_NOTIFY_DETAIL_POINTER) {
+        if (focus.mode != XCB_NOTIFY_MODE_NORMAL || focus.detail == XCB_NOTIFY_DETAIL_POINTER) {
+            break;
+        }
+        if (std::chrono::steady_clock::now() < refocus_until_) {
+            window_.focus();
+        } else {
             close();
         }
         break;

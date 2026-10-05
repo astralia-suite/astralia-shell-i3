@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <cstddef>
 #include <vector>
 #include <xcb/xcb.h>
@@ -59,6 +60,7 @@ class Settings {
     bool open_ = false;
     bool grabbed_ = false;
     bool repaint_pending_ = false;
+    std::chrono::steady_clock::time_point refocus_until_{};
     int repaint_timer_ = 0;
 };
 
