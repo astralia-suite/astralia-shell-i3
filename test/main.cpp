@@ -738,12 +738,17 @@ void check_i3_tree() {
           {"type": "workspace", "num": -1, "rect": {"x": 0, "y": 0, "width": 10, "height": 10}, "nodes": [
             {"id": 9, "window": 99, "rect": {"x": 0, "y": 0, "width": 5, "height": 5}}]}]}]},
         {"type": "output", "name": "LVDS1", "nodes": [{"type": "con", "nodes": [
-          {"type": "workspace", "num": 2, "rect": {"x": 0, "y": 20, "width": 1366, "height": 748},
-           "nodes": [{"id": 5, "window": 50, "floating": "auto_off", "fullscreen_mode": 0,
-                      "rect": {"x": 0, "y": 20, "width": 683, "height": 748},
-                      "window_properties": {"class": "Firefox"}}],
+          {"type": "workspace", "num": 2, "layout": "splith", "rect": {"x": 0, "y": 20, "width": 1000, "height": 800},
+           "nodes": [
+             {"id": 5, "window": 50, "percent": 0.25, "rect": {"x": 9, "y": 9, "width": 9, "height": 9},
+              "window_properties": {"class": "Firefox"}},
+             {"id": 7, "layout": "splitv", "percent": 0.75, "nodes": [
+               {"id": 8, "window": 80, "percent": 0.5, "rect": {"x": 1, "y": 1, "width": 1, "height": 1},
+                "window_properties": {"class": "foot"}},
+               {"id": 10, "window": 100, "percent": 0.5, "fullscreen_mode": 1, "rect": {"x": 1, "y": 1, "width": 1, "height": 1},
+                "window_properties": {"class": "vlc"}}]}],
            "floating_nodes": [{"type": "floating_con", "rect": {"x": 100, "y": 120, "width": 300, "height": 200},
-                               "nodes": [{"id": 6, "window": 60, "floating": "user_on", "fullscreen_mode": 1,
+                               "nodes": [{"id": 6, "window": 60, "floating": "user_on",
                                           "rect": {"x": 100, "y": 120, "width": 300, "height": 200},
                                           "window_properties": {"class": "mpv"}}]}]}]}]}
       ]})");
@@ -752,15 +757,19 @@ void check_i3_tree() {
         return;
     }
     astralia::I3Tree tree = astralia::parse_i3_tree(*root);
-    check(tree.workspaces.size() == 1 && tree.workspaces[0].number == 2 && tree.workspaces[0].width == 1366 && tree.workspaces[0].height == 748, "scratchpad skipped, workspace size kept");
-    check(tree.windows.size() == 2, "scratchpad windows skipped");
-    if (tree.windows.size() != 2) {
+    check(tree.workspaces.size() == 1 && tree.workspaces[0].number == 2 && tree.workspaces[0].width == 1000 && tree.workspaces[0].height == 800, "scratchpad skipped, workspace size kept");
+    check(tree.windows.size() == 4, "scratchpad windows skipped");
+    if (tree.windows.size() != 4) {
         return;
     }
-    const astralia::I3Window &tiled = tree.windows[0];
-    check(tiled.id == 5 && tiled.window_class == "Firefox" && tiled.workspace == 2 && tiled.x == 0 && tiled.y == 0 && tiled.width == 683 && !tiled.floating && !tiled.fullscreen, "tiled window is relative to its workspace");
-    const astralia::I3Window &floating = tree.windows[1];
-    check(floating.id == 6 && floating.floating && floating.fullscreen && floating.x == 100 && floating.y == 100, "floating window is relative to its workspace");
+    const astralia::I3Window &first = tree.windows[0];
+    check(first.id == 5 && first.window_class == "Firefox" && first.workspace == 2 && first.x == 0 && first.y == 0 && first.width == 250 && first.height == 800 && !first.floating && !first.fullscreen, "tiled window takes its percent, ignoring the stale rect");
+    const astralia::I3Window &nested = tree.windows[1];
+    check(nested.id == 8 && nested.x == 250 && nested.y == 0 && nested.width == 750 && nested.height == 400, "nested split divides the remaining box");
+    const astralia::I3Window &fullscreen = tree.windows[2];
+    check(fullscreen.id == 10 && fullscreen.fullscreen && fullscreen.x == 0 && fullscreen.y == 0 && fullscreen.width == 1000 && fullscreen.height == 800, "fullscreen window fills the workspace");
+    const astralia::I3Window &floating = tree.windows[3];
+    check(floating.id == 6 && floating.floating && floating.x == 100 && floating.y == 100 && floating.width == 300, "floating window keeps its rect relative to the workspace");
 }
 
 void check_overview_layout() {

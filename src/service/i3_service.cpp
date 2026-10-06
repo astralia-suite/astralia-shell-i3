@@ -150,41 +150,105 @@ I3Tree I3Service::query_tree() {
 
 namespace {
 
-void collect_tree(const Json &node, uint32_t workspace, double origin_x, double origin_y, bool floating, I3Tree &tree) {
-    std::string type = node.string_or("type");
-    if (type == "workspace") {
-        double number = node.number_or("num", -1);
-        workspace = number >= 1 ? static_cast<uint32_t>(number) : 0;
-        if (const Json *rect = node.find("rect"); rect != nullptr && workspace != 0) {
-            origin_x = rect->number_or("x", 0);
-            origin_y = rect->number_or("y", 0);
-            tree.workspaces.push_back({workspace, rect->number_or("width", 0), rect->number_or("height", 0)});
-        }
+struct Box {
+    double x = 0.0;
+    double y = 0.0;
+    double width = 0.0;
+    double height = 0.0;
+};
+
+I3Window make_window(const Json &node, uint32_t workspace, const Box &box, bool floating) {
+    I3Window entry;
+    entry.id = static_cast<int64_t>(node.number_or("id", 0));
+    if (const Json *properties = node.find("window_properties")) {
+        entry.window_class = properties->string_or("class");
     }
+    entry.x = box.x;
+    entry.y = box.y;
+    entry.width = box.width;
+    entry.height = box.height;
+    entry.workspace = workspace;
+    entry.floating = floating;
+    entry.fullscreen = node.number_or("fullscreen_mode", 0) > 0;
+    return entry;
+}
+
+bool is_window(const Json &node) {
     const Json *window = node.find("window");
-    const Json *rect = node.find("rect");
-    if (workspace != 0 && window != nullptr && window->type == Json::Type::number && rect != nullptr) {
-        I3Window entry;
-        entry.id = static_cast<int64_t>(node.number_or("id", 0));
-        if (const Json *properties = node.find("window_properties")) {
-            entry.window_class = properties->string_or("class");
-        }
-        entry.x = rect->number_or("x", 0) - origin_x;
-        entry.y = rect->number_or("y", 0) - origin_y;
-        entry.width = rect->number_or("width", 0);
-        entry.height = rect->number_or("height", 0);
-        entry.workspace = workspace;
-        entry.floating = floating || node.string_or("floating").ends_with("_on");
-        entry.fullscreen = node.number_or("fullscreen_mode", 0) > 0;
-        tree.windows.push_back(std::move(entry));
+    return window != nullptr && window->type == Json::Type::number;
+}
+
+void place_tiled(const Json &node, const Box &box, const Box &area, uint32_t workspace, I3Tree &tree) {
+    if (is_window(node)) {
+        bool fullscreen = node.number_or("fullscreen_mode", 0) > 0;
+        tree.windows.push_back(make_window(node, workspace, fullscreen ? area : box, false));
+        return;
     }
-    for (std::string_view key : {"nodes", "floating_nodes"}) {
-        const Json *children = node.find(key);
-        if (children == nullptr || children->type != Json::Type::array) {
-            continue;
+    const Json *children = node.find("nodes");
+    if (children == nullptr || children->type != Json::Type::array || children->array.empty()) {
+        return;
+    }
+    std::string layout = node.string_or("layout");
+    double fallback = 1.0 / static_cast<double>(children->array.size());
+    double total = 0.0;
+    for (const Json &child : children->array) {
+        total += child.number_or("percent", fallback);
+    }
+    double offset = 0.0;
+    for (const Json &child : children->array) {
+        double share = child.number_or("percent", fallback) / total;
+        Box inner = box;
+        if (layout == "splith") {
+            inner.x = box.x + offset;
+            inner.width = box.width * share;
+            offset += inner.width;
+        } else if (layout == "splitv") {
+            inner.y = box.y + offset;
+            inner.height = box.height * share;
+            offset += inner.height;
         }
+        place_tiled(child, inner, area, workspace, tree);
+    }
+}
+
+void place_floating(const Json &node, double origin_x, double origin_y, const Box &area, uint32_t workspace, I3Tree &tree) {
+    const Json *rect = node.find("rect");
+    if (is_window(node) && rect != nullptr) {
+        bool fullscreen = node.number_or("fullscreen_mode", 0) > 0;
+        Box box{rect->number_or("x", 0) - origin_x, rect->number_or("y", 0) - origin_y, rect->number_or("width", 0), rect->number_or("height", 0)};
+        tree.windows.push_back(make_window(node, workspace, fullscreen ? area : box, true));
+        return;
+    }
+    const Json *children = node.find("nodes");
+    if (children == nullptr || children->type != Json::Type::array) {
+        return;
+    }
+    for (const Json &child : children->array) {
+        place_floating(child, origin_x, origin_y, area, workspace, tree);
+    }
+}
+
+void collect_tree(const Json &node, I3Tree &tree) {
+    if (node.string_or("type") == "workspace") {
+        double number = node.number_or("num", -1);
+        const Json *rect = node.find("rect");
+        if (number < 1 || rect == nullptr) {
+            return;
+        }
+        uint32_t workspace = static_cast<uint32_t>(number);
+        Box area{0.0, 0.0, rect->number_or("width", 0), rect->number_or("height", 0)};
+        tree.workspaces.push_back({workspace, area.width, area.height});
+        place_tiled(node, area, area, workspace, tree);
+        if (const Json *floating = node.find("floating_nodes"); floating != nullptr && floating->type == Json::Type::array) {
+            for (const Json &child : floating->array) {
+                place_floating(child, rect->number_or("x", 0), rect->number_or("y", 0), area, workspace, tree);
+            }
+        }
+        return;
+    }
+    if (const Json *children = node.find("nodes"); children != nullptr && children->type == Json::Type::array) {
         for (const Json &child : children->array) {
-            collect_tree(child, workspace, origin_x, origin_y, floating || key == "floating_nodes", tree);
+            collect_tree(child, tree);
         }
     }
 }
@@ -193,7 +257,7 @@ void collect_tree(const Json &node, uint32_t workspace, double origin_x, double 
 
 I3Tree parse_i3_tree(const Json &root) {
     I3Tree tree;
-    collect_tree(root, 0, 0.0, 0.0, false, tree);
+    collect_tree(root, tree);
     return tree;
 }
 
