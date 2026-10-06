@@ -60,3 +60,6 @@ Drop an entry once newer knowledge fully supersedes it.
 - Run the thumbnail worker at nice `10`. On the X201's two cores, decoding otherwise competes with the UI thread.
 - A nested `Xephyr` shows no cursor and ignores XTest clicks for the shell. Click inside its window by hand.
 - Paint overlapping translucent shapes with outer borders, then `CAIRO_OPERATOR_SOURCE` inner fills. `OVER` double-darkens where shapes overlap.
+- Subtract the workspace rect from `GET_TREE` window rects. i3 reports absolute coordinates, including the bar strut offset.
+- Ignore focus loss briefly after an i3 command and refocus. i3 hands focus to a client on workspace switches, closing overlays.
+- Wait for the i3 `RUN_COMMAND` reply before querying again. Otherwise the tree read can precede the command's effect.

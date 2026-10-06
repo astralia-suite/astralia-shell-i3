@@ -20,6 +20,7 @@
 #include "modules/logout.h"
 #include "modules/notification.h"
 #include "modules/osd.h"
+#include "modules/overview.h"
 #include "modules/polkit.h"
 #include "modules/settings.h"
 #include "modules/wallpaper.h"
@@ -60,6 +61,7 @@ int main(int argc, char **argv) {
     astralia::BarSet bars(*x, *loop, **ipc, services);
     astralia::Launcher launcher(*x, *loop, **ipc);
     astralia::Logout logout(*x, *loop, **ipc);
+    astralia::Overview overview(*x, *loop, **ipc, services);
     astralia::Polkit polkit(*x, *loop, services);
     astralia::Notifications notifications(*x, *loop, services);
     astralia::Osd osd(*x, *loop, services);

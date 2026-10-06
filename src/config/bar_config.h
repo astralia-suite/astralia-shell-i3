@@ -42,6 +42,7 @@ inline constexpr int pill_height = 12;
 inline constexpr int pill_width = 12;
 inline constexpr int pill_active_width = 24;
 inline constexpr int pill_spacing = 5;
+inline constexpr int overview_gap = 8;
 
 // Dividers
 inline constexpr double divider_height_ratio = 0.4;

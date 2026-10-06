@@ -1,12 +1,13 @@
-# Task: plan 18
+# Task: overview module
 
-- [x] `bar_config.h` style constants, `BarStyle`
-- [x] `bar/styles/geometry`, `continuous`
-- [x] `Bar` layout/paint through style, `PanelWindow::set_top`, panel call sites
-- [x] move `widget_capsule`, rename `audio_panel` to `volume_panel`
-- [x] `./build.sh test` (no visual change)
-- [x] `bar/styles/okinami` and `Bar` style switch
-- [x] `settings_service` key, `bar_tab`, tab enum
-- [x] tests
-- [x] docs: `index.md`, `knowledge.md`, `settings-and-multimonitor.md`
+- [x] `core/json.{h,cpp}` and test
+- [x] `I3Service` `query_tree`, `parse_i3_tree`, `move_window`, `kill_window` and test
+- [x] `resolve_window_icon_path` in `render/app_icon` (not unit tested, depends on installed themes)
+- [x] `config/overview_config.h`
+- [x] `modules/overview/layout.{h,cpp}` and test
+- [x] `modules/overview.{h,cpp}`
+- [x] `OverviewWidget` and `Bar` button
+- [x] `main.cpp`, `meson.build`
+- [x] docs: `index.md`, `knowledge.md`
 - [x] `clang-format`, `./build.sh test`
+- [ ] manual run under i3 and on the X201

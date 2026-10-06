@@ -19,6 +19,7 @@
 #include "core/cli.h"
 #include "core/config_file.h"
 #include "core/ipc.h"
+#include "core/json.h"
 #include "core/runtime_paths.h"
 
 #include "modules/bar/panel/battery_panel.h"
@@ -41,6 +42,7 @@
 #include "modules/launcher/visit_store.h"
 #include "modules/logout/layout.h"
 #include "modules/notification/layout.h"
+#include "modules/overview/layout.h"
 #include "modules/polkit/layout.h"
 #include "modules/settings/layout.h"
 
@@ -58,6 +60,7 @@
 
 #include "service/audio_service.h"
 #include "service/bluetooth_service.h"
+#include "service/i3_service.h"
 #include "service/media_service.h"
 #include "service/network_service.h"
 #include "service/tray_service.h"
@@ -219,6 +222,9 @@ void check_workspace_row() {
     check(workspace_at(status, 20) == 1u, "active pill");
     check(workspace_at(status, 50) == 2u, "last pill");
     check(!workspace_at(status, 100), "past the row");
+    check(!astralia::workspace_overview_at(status, 50), "last pill is not the overview icon");
+    check(astralia::workspace_overview_at(status, 12 + 5 + 24 + 5 + 12 + 5), "icon after the pills opens the overview");
+    check(!workspace_at(status, 12 + 5 + 24 + 5 + 12 + 5), "icon area is not a workspace");
     check(astralia::workspace_row_width({}) == 0, "no workspaces is empty");
 }
 
@@ -707,7 +713,88 @@ void check_tray() {
     check(astralia::tray_menu_height(&menu.children, false) == 2 * 6 + 2 * 32 + 9, "menu height counts rows and separator");
 }
 
+void check_json() {
+    using astralia::Json;
+    auto parsed = astralia::parse_json(R"({"a": 1.5, "b": [true, false, null], "c": {"d": "xé\n"}, "e": -3})");
+    check(parsed.has_value(), "valid document parses");
+    if (!parsed) {
+        return;
+    }
+    check(parsed->number_or("a", 0) == 1.5 && parsed->number_or("e", 0) == -3, "numbers parse");
+    const Json *list = parsed->find("b");
+    check(list != nullptr && list->array.size() == 3 && list->array[0].boolean && !list->array[1].boolean && list->array[2].type == Json::Type::null, "array of literals");
+    const Json *nested = parsed->find("c");
+    check(nested != nullptr && nested->string_or("d") == "x\xC3\xA9\n", "escapes decode to UTF-8");
+    check(parsed->string_or("missing", "fallback") == "fallback", "missing key falls back");
+    check(!astralia::parse_json("{\"a\": }").has_value(), "missing value rejected");
+    check(!astralia::parse_json("[1, 2").has_value(), "unterminated array rejected");
+    check(!astralia::parse_json("{} x").has_value(), "trailing text rejected");
+}
+
+void check_i3_tree() {
+    auto root = astralia::parse_json(R"({
+      "type": "root", "nodes": [
+        {"type": "output", "name": "__i3", "nodes": [{"type": "con", "nodes": [
+          {"type": "workspace", "num": -1, "rect": {"x": 0, "y": 0, "width": 10, "height": 10}, "nodes": [
+            {"id": 9, "window": 99, "rect": {"x": 0, "y": 0, "width": 5, "height": 5}}]}]}]},
+        {"type": "output", "name": "LVDS1", "nodes": [{"type": "con", "nodes": [
+          {"type": "workspace", "num": 2, "rect": {"x": 0, "y": 20, "width": 1366, "height": 748},
+           "nodes": [{"id": 5, "window": 50, "floating": "auto_off", "fullscreen_mode": 0,
+                      "rect": {"x": 0, "y": 20, "width": 683, "height": 748},
+                      "window_properties": {"class": "Firefox"}}],
+           "floating_nodes": [{"type": "floating_con", "rect": {"x": 100, "y": 120, "width": 300, "height": 200},
+                               "nodes": [{"id": 6, "window": 60, "floating": "user_on", "fullscreen_mode": 1,
+                                          "rect": {"x": 100, "y": 120, "width": 300, "height": 200},
+                                          "window_properties": {"class": "mpv"}}]}]}]}]}
+      ]})");
+    check(root.has_value(), "tree parses");
+    if (!root) {
+        return;
+    }
+    astralia::I3Tree tree = astralia::parse_i3_tree(*root);
+    check(tree.workspaces.size() == 1 && tree.workspaces[0].number == 2 && tree.workspaces[0].width == 1366 && tree.workspaces[0].height == 748, "scratchpad skipped, workspace size kept");
+    check(tree.windows.size() == 2, "scratchpad windows skipped");
+    if (tree.windows.size() != 2) {
+        return;
+    }
+    const astralia::I3Window &tiled = tree.windows[0];
+    check(tiled.id == 5 && tiled.window_class == "Firefox" && tiled.workspace == 2 && tiled.x == 0 && tiled.y == 0 && tiled.width == 683 && !tiled.floating && !tiled.fullscreen, "tiled window is relative to its workspace");
+    const astralia::I3Window &floating = tree.windows[1];
+    check(floating.id == 6 && floating.floating && floating.fullscreen && floating.x == 100 && floating.y == 100, "floating window is relative to its workspace");
+}
+
+void check_overview_layout() {
+    using namespace astralia;
+    check(overview_workspace_at(0, 0, 0) == 1 && overview_workspace_at(0, 1, 4) == 10 && overview_workspace_at(1, 0, 0) == 11, "workspace ids follow rows then pages");
+    check(overview_page_of(1) == 0 && overview_page_of(10) == 0 && overview_page_of(11) == 1, "page of workspace");
+    check(overview_step(1, -1, 0) == 5 && overview_step(5, 1, 0) == 1 && overview_step(1, 0, 1) == 6 && overview_step(6, 0, 1) == 1, "steps wrap within the page");
+    check(overview_step(12, 0, 0) == 12 && overview_step(11, -1, 0) == 15, "steps stay on their page");
+
+    OverviewLayout layout = overview_layout(1366, 768, 1366, 748, 0);
+    check(layout.cells.size() == 10 && layout.cells[0].workspace == 1 && layout.cells[9].workspace == 10, "ten cells");
+    check(layout.panel.x >= 0 && layout.panel.y >= 0 && layout.panel.x + layout.panel.width <= 1366 && layout.panel.y + layout.panel.height <= 768, "panel fits the surface");
+    check(std::abs(layout.panel.x + layout.panel.width / 2.0 - 683.0) <= 1.0, "panel is centred");
+    OverviewLayout huge = overview_layout(5000, 3000, 5000, 3000, 0);
+    check(huge.scale == 0.15, "scale is capped");
+    OverviewLayout tiny = overview_layout(400, 300, 1366, 748, 0);
+    check(tiny.scale < 0.15 && tiny.panel.width <= 400 && tiny.panel.height <= 300, "scale shrinks to fit");
+
+    const OverviewCell *second = overview_find_cell(layout, 2);
+    check(second != nullptr && overview_find_cell(layout, 11) == nullptr, "cells are found by workspace");
+    if (second != nullptr) {
+        check(overview_cell_at(layout, second->rect.x + 1, second->rect.y + 1) == second, "cell hit test");
+        check(overview_cell_at(layout, second->rect.x - 1, second->rect.y - 1) == nullptr, "spacing between cells is not a hit");
+        OverviewRect tile = overview_tile_rect(second->rect, 1366, 748, 683, 374, 683, 374);
+        check(tile.x + tile.width <= second->rect.x + second->rect.width + 1e-9 && tile.y + tile.height <= second->rect.y + second->rect.height + 1e-9, "tile stays inside its cell");
+        OverviewRect off = overview_tile_rect(second->rect, 1366, 748, -500, 9000, 100, 100);
+        check(off.x >= second->rect.x && off.y + off.height <= second->rect.y + second->rect.height + 1e-9, "off-screen window is clamped");
+    }
+}
+
 int main() {
+    check_json();
+    check_i3_tree();
+    check_overview_layout();
     check_ms_until_next_second();
     check_parse_invocation();
     check_runtime_path();

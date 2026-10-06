@@ -48,6 +48,7 @@
 - `single_instance.{h,cpp}`: Ensures one shell per display.
 - `daemon.{h,cpp}`: Detaches the shell into the background with output to the log.
 - `ipc.{h,cpp}`: Unix socket IPC server, verb dispatch and client.
+- `json.{h,cpp}`: Minimal JSON value and parser for i3 IPC replies.
 - `unique_fd.h`: Owning file descriptor.
 - `log.{h,cpp}`: Info and error logging to stderr.
 - `x_connection.{h,cpp}`: X connection with screen, visuals, atoms, EWMH and RandR outputs.
@@ -68,6 +69,7 @@
 - `polkit_config.h`: Polkit card constants and prompt texts.
 - `notification_config.h`: Notification card and stack constants.
 - `osd_config.h`: OSD pill constants and timings.
+- `overview_config.h`: Overview grid, scale, rounding, border, icon and focus-grace constants.
 - `wallpaper_config.h`: Wallpaper config file location and wildcard key.
 - `settings_config.h`: Settings file, defaults, overlay, tab, chip, tile and thumbnail grid constants.
 
@@ -80,6 +82,7 @@
 - `notification.{h,cpp}`: Desktop notification cards.
 - `polkit.{h,cpp}`: Polkit password prompt.
 - `osd.{h,cpp}`: Brightness, volume and mic level popup.
+- `overview.{h,cpp}`: Workspace overview overlay with window tiles, click, drag, arrow, digit and delete keys.
 - `wallpaper.{h,cpp}`: Per-output desktop wallpaper.
 - `settings.{h,cpp}`: Settings overlay with the Bar, Displays and Wallpaper tabs.
 
@@ -96,7 +99,7 @@
 - `clock_widget.{h,cpp}`: Clock icon with date and time label.
 - `media_widget.{h,cpp}`: Media icon with label.
 - `logout_widget.{h,cpp}`: Logout icon with label.
-- `workspace_widget.{h,cpp}`: Workspace pill row and click hit-test.
+- `workspace_widget.{h,cpp}`: Workspace pill row with the overview icon, and click hit-tests.
 - `bluetooth_widget.{h,cpp}`: Bluetooth icon with device or state label.
 - `network_widget.{h,cpp}`: Network icon with SSID label.
 - `brightness_widget.{h,cpp}`: Brightness icon with percent label.
@@ -130,7 +133,12 @@
 
 - `layout.{h,cpp}`: Logout button positions and hit-test.
 
+## `src/modules/overview/`
+
+- `layout.{h,cpp}`: Overview grid cells, paging, tile scaling, hit-test and wrapping steps.
+
 ## `src/modules/notification/`
+
 
 - `layout.{h,cpp}`: Notification card sizes, stack position and close hit-test.
 
@@ -153,7 +161,7 @@
 - `palette.h`: Shared colors, radii and borders.
 - `icons.h`: Icon glyph codepoints and level icon pickers.
 - `app_fonts.{h,cpp}`: Registers the bundled fonts.
-- `app_icon.{h,cpp}`: Finds and loads application icons from the icon theme.
+- `app_icon.{h,cpp}`: Finds and loads application icons from the icon theme, including by window class.
 - `image_decode.{h,cpp}`: Decodes raster and SVG images, JPEGs at reduced size, crops covers to a box and writes JPEGs.
 - `cover_cache.{h,cpp}`: Loads images cropped to a box size from an on-disk JPEG or PNG cache, pruned by age and size.
 - `draw.{h,cpp}`: Shared cairo drawing helpers.
@@ -164,7 +172,7 @@
 
 ## `src/service/`
 
-- `i3_service.{h,cpp}`: i3 workspace state and switching.
+- `i3_service.{h,cpp}`: i3 workspace state and switching, window tree query, window move and kill.
 - `output_service.{h,cpp}`: RandR output list and change notifications.
 - `settings_service.{h,cpp}`: Creates, reads, writes and watches `settings.conf`, including the bar style.
 - `user_service.{h,cpp}`: Display name and uptime text for the settings profile block.

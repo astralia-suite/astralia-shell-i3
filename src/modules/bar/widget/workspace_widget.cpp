@@ -4,6 +4,9 @@
 
 #include "modules/bar/widget/workspace_widget.h"
 
+#include "render/icons.h"
+#include "render/text.h"
+
 namespace astralia {
 
 namespace {
@@ -22,7 +25,24 @@ void fill_pill(cairo_t *cr, double x, double y, double width, double height) {
     cairo_fill(cr);
 }
 
+const Text &overview_glyph() {
+    static const Text glyph = [] {
+        Text text(bar_config::icon_font);
+        text.set(icon::overview);
+        return text;
+    }();
+    return glyph;
+}
+
 } // namespace
+
+int workspace_overview_width() {
+    return bar_config::overview_gap + overview_glyph().width();
+}
+
+bool workspace_overview_at(const I3Status &status, int offset) {
+    return offset >= workspace_row_width(status) + bar_config::overview_gap / 2;
+}
 
 int workspace_row_width(const I3Status &status) {
     int width = 0;
@@ -56,6 +76,8 @@ void draw_workspace_row(cairo_t *cr, const I3Status &status, double x, int top, 
         fill_pill(cr, x, y, width, bar_config::pill_height);
         x += width + bar_config::pill_spacing;
     }
+    cairo_set_source_rgba(cr, palette::text.r, palette::text.g, palette::text.b, palette::text.a);
+    overview_glyph().draw_centered(cr, x - bar_config::pill_spacing + bar_config::overview_gap, top, height);
 }
 
 } // namespace astralia

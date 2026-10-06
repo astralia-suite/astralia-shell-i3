@@ -213,7 +213,7 @@ void Bar::layout() {
     logout_rect_ = {panel_.x + spec_->padding, panel_.y, logout_->width() + 2 * pad, panel_.height};
     const I3Status &workspaces = services_.i3.status();
     workspace_rect_ = {logout_rect_.x + logout_rect_.width + gap, panel_.y,
-                       workspace_row_width(workspaces) + 2 * pad, panel_.height};
+                       workspace_row_width(workspaces) + workspace_overview_width() + 2 * pad, panel_.height};
     add_divider(logout_rect_, workspace_rect_);
     left_end_ = std::round(workspace_rect_.x + workspace_rect_.width + padding);
 
@@ -380,7 +380,10 @@ void Bar::click(const xcb_button_press_event_t &event) {
         if (logout_rect_.contains(event.event_x)) {
             ipc_.dispatch("logout");
         } else if (workspace_rect_.contains(event.event_x)) {
-            if (auto index = workspace_at(services_.i3.status(), event.event_x - workspace_rect_.x - bar_config::pill_pad)) {
+            int offset = event.event_x - workspace_rect_.x - bar_config::pill_pad;
+            if (workspace_overview_at(services_.i3.status(), offset)) {
+                ipc_.dispatch("overview");
+            } else if (auto index = workspace_at(services_.i3.status(), offset)) {
                 services_.i3.switch_to(*index);
             }
         }
