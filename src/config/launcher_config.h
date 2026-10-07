@@ -43,10 +43,10 @@ inline constexpr const char *bullet_prefix = "C";
 inline constexpr const char *bullet_suffix = ".png";
 
 // Launch commands
-inline constexpr const char *browser = "browser";
-inline constexpr const char *editor = "editor";
-inline constexpr const char *file_manager = "file-manager";
-inline constexpr const char *terminal = "terminal";
+inline constexpr const char *browser = "astralia-open browser";
+inline constexpr const char *editor = "astralia-open editor";
+inline constexpr const char *file_manager = "astralia-open file-manager";
+inline constexpr const char *terminal = "astralia-open terminal";
 inline constexpr const char *open = "xdg-open";
 
 // Web search
