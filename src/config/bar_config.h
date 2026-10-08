@@ -44,6 +44,12 @@ inline constexpr int pill_active_width = 24;
 inline constexpr int pill_spacing = 5;
 inline constexpr int overview_gap = 8;
 
+// Dock
+inline constexpr int dock_icon_size = 22;
+inline constexpr int dock_icon_spacing = 10;
+inline constexpr double dock_focused_opacity = 1.0;
+inline constexpr double dock_unfocused_opacity = 0.5;
+
 // Dividers
 inline constexpr double divider_height_ratio = 0.4;
 inline constexpr double divider_width = 1.0;

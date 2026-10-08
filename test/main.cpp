@@ -31,6 +31,7 @@
 #include "modules/bar/widget/battery_widget.h"
 #include "modules/bar/widget/bluetooth_widget.h"
 #include "modules/bar/widget/clock_widget.h"
+#include "modules/bar/widget/dock_widget.h"
 #include "modules/bar/widget/network_widget.h"
 #include "modules/bar/widget/workspace_widget.h"
 #include "modules/launcher/apps_provider.h"
@@ -743,7 +744,7 @@ void check_i3_tree() {
              {"id": 5, "window": 50, "percent": 0.25, "rect": {"x": 9, "y": 9, "width": 9, "height": 9},
               "window_properties": {"class": "Firefox"}},
              {"id": 7, "layout": "splitv", "percent": 0.75, "nodes": [
-               {"id": 8, "window": 80, "percent": 0.5, "rect": {"x": 1, "y": 1, "width": 1, "height": 1},
+               {"id": 8, "window": 80, "percent": 0.5, "focused": true, "rect": {"x": 1, "y": 1, "width": 1, "height": 1},
                 "window_properties": {"class": "foot"}},
                {"id": 10, "window": 100, "percent": 0.5, "fullscreen_mode": 1, "rect": {"x": 1, "y": 1, "width": 1, "height": 1},
                 "window_properties": {"class": "vlc"}}]}],
@@ -770,6 +771,12 @@ void check_i3_tree() {
     check(fullscreen.id == 10 && fullscreen.fullscreen && fullscreen.x == 0 && fullscreen.y == 0 && fullscreen.width == 1000 && fullscreen.height == 800, "fullscreen window fills the workspace");
     const astralia::I3Window &floating = tree.windows[3];
     check(floating.id == 6 && floating.floating && floating.x == 100 && floating.y == 100 && floating.width == 300, "floating window keeps its rect relative to the workspace");
+    check(nested.focused && !first.focused && !fullscreen.focused && !floating.focused, "focused flag parsed");
+
+    std::vector<astralia::DockEntry> dock = astralia::dock_entries(tree, 2);
+    check(dock.size() == 4 && dock[0].window_class == "Firefox" && dock[1].window_class == "vlc" && dock[2].window_class == "mpv" && dock[3].window_class == "foot", "dock lists the workspace windows left to right");
+    check(!dock[0].focused && !dock[1].focused && !dock[2].focused && dock[3].focused, "dock marks the focused window");
+    check(astralia::dock_entries(tree, 3).empty(), "dock is empty on a workspace without windows");
 }
 
 void check_overview_layout() {

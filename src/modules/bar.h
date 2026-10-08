@@ -30,6 +30,7 @@ class BrightnessPanel;
 class BrightnessWidget;
 class ClockPanel;
 class ClockWidget;
+class DockWidget;
 class LogoutWidget;
 class MediaPanel;
 class MediaWidget;
@@ -76,6 +77,7 @@ class Bar {
     void draw_divider(double x);
     void draw_all();
     void redraw_clock();
+    void refresh_dock();
     void refresh(Item item);
     void click(const xcb_button_press_event_t &event);
     void hover(std::optional<int> x, bool redraw = false);
@@ -107,6 +109,7 @@ class Bar {
     std::unique_ptr<ClockWidget> clock_;
     std::unique_ptr<MediaWidget> media_;
     std::unique_ptr<LogoutWidget> logout_;
+    std::unique_ptr<DockWidget> dock_;
     std::unique_ptr<BluetoothWidget> bluetooth_;
     std::unique_ptr<NetworkWidget> network_;
     std::unique_ptr<BrightnessWidget> brightness_;
@@ -125,6 +128,7 @@ class Bar {
     std::unique_ptr<TrayPanel> tray_panel_;
     Rect logout_rect_{};
     Rect workspace_rect_{};
+    Rect dock_rect_{};
     std::chrono::steady_clock::time_point linger_until_{};
     int linger_timer_ = -1;
 };

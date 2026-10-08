@@ -105,6 +105,7 @@ core = static_library(
     'src/modules/bar/widget/bluetooth_widget.cpp',
     'src/modules/bar/widget/brightness_widget.cpp',
     'src/modules/bar/widget/clock_widget.cpp',
+    'src/modules/bar/widget/dock_widget.cpp',
     'src/modules/bar/widget/logout_widget.cpp',
     'src/modules/bar/widget/media_widget.cpp',
     'src/modules/bar/widget/network_widget.cpp',

@@ -75,7 +75,7 @@
 
 ## `src/modules/`
 
-- `bar.{h,cpp}`: Top bar on one output with logout, workspaces, media, clock, tray and status widgets; lays them out, paints them through the active `BarStyle` and opens their panels. A style change re-places the window, strut and panel tops.
+- `bar.{h,cpp}`: Top bar on one output with logout, workspaces, dock, media, clock, tray and status widgets; lays them out, paints them through the active `BarStyle` and opens their panels. A style change re-places the window, strut and panel tops.
 - `bar_set.{h,cpp}`: Keeps one bar per enabled output, moving or hiding bars on output and settings changes.
 - `launcher.{h,cpp}`: App, file and command launcher overlay.
 - `logout.{h,cpp}`: Logout overlay with power action buttons.
@@ -100,6 +100,7 @@
 - `media_widget.{h,cpp}`: Media icon with label.
 - `logout_widget.{h,cpp}`: Logout icon with label.
 - `workspace_widget.{h,cpp}`: Workspace pill row with the overview icon, and click hit-tests.
+- `dock_widget.{h,cpp}`: Icons of the current workspace's windows ordered by x, dimming unfocused ones.
 - `bluetooth_widget.{h,cpp}`: Bluetooth icon with device or state label.
 - `network_widget.{h,cpp}`: Network icon with SSID label.
 - `brightness_widget.{h,cpp}`: Brightness icon with percent label.
@@ -172,7 +173,7 @@
 
 ## `src/service/`
 
-- `i3_service.{h,cpp}`: i3 workspace state and switching, window tree query, window move and kill.
+- `i3_service.{h,cpp}`: i3 workspace state and switching, window tree query with focus, window move and kill, focus signal.
 - `output_service.{h,cpp}`: RandR output list and change notifications.
 - `settings_service.{h,cpp}`: Creates, reads, writes and watches `settings.conf`, including the bar style.
 - `user_service.{h,cpp}`: Display name and uptime text for the settings profile block.

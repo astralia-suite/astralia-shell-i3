@@ -23,6 +23,7 @@
 #include "modules/bar/widget/bluetooth_widget.h"
 #include "modules/bar/widget/brightness_widget.h"
 #include "modules/bar/widget/clock_widget.h"
+#include "modules/bar/widget/dock_widget.h"
 #include "modules/bar/widget/logout_widget.h"
 #include "modules/bar/widget/media_widget.h"
 #include "modules/bar/widget/network_widget.h"
@@ -42,6 +43,7 @@ Bar::Bar(XConnection &x, EventLoop &loop, IpcServer &ipc, Services &services, co
     clock_ = std::make_unique<ClockWidget>();
     media_ = std::make_unique<MediaWidget>();
     logout_ = std::make_unique<LogoutWidget>();
+    dock_ = std::make_unique<DockWidget>();
     bluetooth_ = std::make_unique<BluetoothWidget>();
     network_ = std::make_unique<NetworkWidget>();
     brightness_ = std::make_unique<BrightnessWidget>();
@@ -51,7 +53,18 @@ Bar::Bar(XConnection &x, EventLoop &loop, IpcServer &ipc, Services &services, co
     items_ = {tray_.get(), network_.get(), bluetooth_.get(), volume_.get(), brightness_.get(), battery_.get(), media_.get(), clock_.get()};
     refresh_style();
     apply_output(output.geometry);
-    services_.i3.changed.connect([this] { draw_all(); });
+    refresh_dock();
+    services_.i3.changed.connect([this] {
+        refresh_dock();
+        draw_all();
+    });
+    auto update_dock = [this] {
+        if (dock_->update(services_.i3.query_tree(), services_.i3.status().current + 1)) {
+            draw_all();
+        }
+    };
+    services_.i3.windows_changed.connect(update_dock);
+    services_.i3.focus_changed.connect(update_dock);
     auto update = [this](Item item) {
         refresh(item);
         draw_all();
@@ -215,7 +228,14 @@ void Bar::layout() {
     workspace_rect_ = {logout_rect_.x + logout_rect_.width + gap, panel_.y,
                        workspace_row_width(workspaces) + workspace_overview_width() + 2 * pad, panel_.height};
     add_divider(logout_rect_, workspace_rect_);
-    left_end_ = std::round(workspace_rect_.x + workspace_rect_.width + padding);
+    const Rect *left_last = &workspace_rect_;
+    dock_rect_ = {};
+    if (dock_->visible()) {
+        dock_rect_ = {workspace_rect_.x + workspace_rect_.width + gap, panel_.y, dock_->width() + 2 * pad, panel_.height};
+        add_divider(workspace_rect_, dock_rect_);
+        left_last = &dock_rect_;
+    }
+    left_end_ = std::round(left_last->x + left_last->width + padding);
 
     int media_width = media_->width() + 2 * pad;
     int clock_width = clock_->width() + 2 * pad;
@@ -255,6 +275,9 @@ void Bar::draw_all() {
     set_source(window_.cr(), palette::text);
     logout_->draw(window_.cr(), logout_rect_.x + bar_config::pill_pad, panel_.y, panel_.height);
     draw_workspace_row(window_.cr(), services_.i3.status(), workspace_rect_.x + bar_config::pill_pad, panel_.y, panel_.height);
+    if (dock_->visible()) {
+        dock_->draw(window_.cr(), dock_rect_.x + bar_config::pill_pad, panel_.y, panel_.height);
+    }
     set_source(window_.cr(), palette::text);
     media_->draw(window_.cr(), item_rects_[media].x + bar_config::pill_pad, panel_.y, panel_.height);
     clock_->draw(window_.cr(), item_rects_[clock].x + bar_config::pill_pad, panel_.y, panel_.height);
@@ -286,6 +309,10 @@ void Bar::redraw_clock() {
     set_source(window_.cr(), palette::text);
     clock_->draw(window_.cr(), rect.x + bar_config::pill_pad, panel_.y, panel_.height);
     window_.present(dirty.x, dirty.y, dirty.width, dirty.height);
+}
+
+void Bar::refresh_dock() {
+    dock_->update(services_.i3.query_tree(), services_.i3.status().current + 1);
 }
 
 void Bar::refresh(Item item) {

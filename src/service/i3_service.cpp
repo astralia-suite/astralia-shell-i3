@@ -32,6 +32,10 @@ I3Service::I3Service(XConnection &x, EventLoop &loop) : x_(x) {
             windows_changed.emit();
             return;
         }
+        if (property.atom == ewmh->_NET_ACTIVE_WINDOW) {
+            focus_changed.emit();
+            return;
+        }
         if (property.atom != ewmh->_NET_CURRENT_DESKTOP &&
             property.atom != ewmh->_NET_DESKTOP_NAMES) {
             return;
@@ -170,6 +174,7 @@ I3Window make_window(const Json &node, uint32_t workspace, const Box &box, bool 
     entry.workspace = workspace;
     entry.floating = floating;
     entry.fullscreen = node.number_or("fullscreen_mode", 0) > 0;
+    entry.focused = node.boolean_or("focused", false);
     return entry;
 }
 

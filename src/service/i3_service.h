@@ -31,6 +31,7 @@ struct I3Window {
     uint32_t workspace = 0;
     bool floating = false;
     bool fullscreen = false;
+    bool focused = false;
 
     bool operator==(const I3Window &) const = default;
 };
@@ -62,6 +63,7 @@ class I3Service {
 
     Signal<> changed;
     Signal<> windows_changed;
+    Signal<> focus_changed;
 
   private:
     bool refresh();
