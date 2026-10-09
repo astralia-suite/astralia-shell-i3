@@ -7,6 +7,7 @@
 # test: build and run the unit tests
 # install: build and deploy into /usr/bin/
 # run: kill the running shell, install and start it
+# uninstall: remove the installed files
 # NATIVE_CPU=false: build without the X201 tuning (-march=westmere)
 
 set -euo pipefail
@@ -30,11 +31,12 @@ cmd_test() { cmd_build; meson test -C build --print-errorlogs; }
 cmd_install() { cmd_build; sudo meson install -C build --no-rebuild; }
 
 cmd_run() { astralia-shell kill 2>/dev/null || true; cmd_install; astralia-shell; }
+cmd_uninstall() { sudo ninja -C build uninstall; }
 
 main() {
     local cmd="${1:-build}"
     case "$cmd" in
-    setup | build | test | install | run) "cmd_$cmd" ;;
+    setup | build | test | install | run | uninstall) "cmd_$cmd" ;;
     *) echo "unknown command: $cmd" >&2; exit 2 ;;
     esac
 }
